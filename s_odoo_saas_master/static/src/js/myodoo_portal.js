@@ -506,6 +506,42 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
     },
 
     _initPricing() {
+        const planModal = document.getElementById("orderPlanModal");
+        const userPriceMonthly = parseFloat(planModal?.dataset.userPriceMonthly || 1);
+        const userPriceYearly = parseFloat(planModal?.dataset.userPriceYearly || (userPriceMonthly * 12));
+        const currencySymbol = planModal?.dataset.currencySymbol || "XPF";
+
+        const updateModalPricing = () => {
+            const activePlanBtn = document.querySelector("[data-choose-plan].selected") || document.querySelector('[data-choose-plan="Essential"]');
+            const planName = activePlanBtn ? activePlanBtn.dataset.choosePlan : "Essential";
+            const annual = document.querySelector('[data-billing="annual"]')?.classList.contains("active");
+            const basePrice = activePlanBtn ? (annual ? activePlanBtn.dataset.annualPrice : activePlanBtn.dataset.monthlyPrice) : (annual ? "151,980" : "14,900");
+
+            const countInput = document.getElementById("planUsersCount");
+            let usersCount = countInput ? (parseInt(countInput.value) || 1) : 1;
+            if (usersCount < 1) usersCount = 1;
+
+            const userUnitPrice = annual ? userPriceYearly : userPriceMonthly;
+            const userPriceEl = document.getElementById("userPriceDisplay");
+            if (userPriceEl) {
+                userPriceEl.textContent = userUnitPrice.toLocaleString() + " " + currencySymbol + " / user / " + (annual ? "year" : "month");
+            }
+
+            const modalTitle = document.getElementById("planModalTitle");
+            const orderPlanName = document.getElementById("orderPlanName");
+            const orderPlanSummary = document.getElementById("orderPlanSummary");
+            const orderCycleNote = document.getElementById("orderCycleNote");
+
+            if (modalTitle) modalTitle.textContent = "Deploy " + planName + " Plan";
+            if (orderPlanName) orderPlanName.value = planName;
+            if (orderPlanSummary) {
+                orderPlanSummary.textContent = planName + " Plan · " + basePrice + " " + currencySymbol + " / " + (annual ? "year" : "month") + " (" + usersCount + " " + (usersCount === 1 ? "User" : "Users") + ")";
+            }
+            if (orderCycleNote) {
+                orderCycleNote.textContent = annual ? "Annual subscription · 15% discount included" : "Monthly subscription · Cancel or upgrade anytime";
+            }
+        };
+
         // Monthly / Annual toggle
         const billingBtns = document.querySelectorAll("[data-billing]");
         if (billingBtns.length) {
@@ -527,40 +563,17 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
                     const orderPriceBy = document.getElementById("orderPriceBy");
                     if (orderPriceBy) orderPriceBy.value = annual ? "yearly" : "monthly";
 
-                    const activePlanBtn = document.querySelector("[data-choose-plan].selected");
-                    if (activePlanBtn) {
-                        const price = annual ? activePlanBtn.dataset.annualPrice : activePlanBtn.dataset.monthlyPrice;
-                        const planName = activePlanBtn.dataset.choosePlan;
-                        const summary = document.getElementById("orderPlanSummary");
-                        const note = document.getElementById("orderCycleNote");
-                        if (summary) summary.textContent = planName + " Plan · " + price + (annual ? " XPF / year" : " XPF / month");
-                        if (note) note.textContent = annual ? "Annual subscription · 15% discount included" : "Monthly subscription · Cancel or upgrade anytime";
-                    }
+                    updateModalPricing();
                 });
             });
         }
 
         // Plan Choose button -> Open Modal
-        const planModal = document.getElementById("orderPlanModal");
         document.querySelectorAll("[data-choose-plan]").forEach(btn => {
             btn.addEventListener("click", () => {
-                const planName = btn.dataset.choosePlan;
                 document.querySelectorAll("[data-choose-plan]").forEach(b => b.classList.remove("selected"));
                 btn.classList.add("selected");
-
-                const annual = document.querySelector('[data-billing="annual"]')?.classList.contains("active");
-                const price = annual ? btn.dataset.annualPrice : btn.dataset.monthlyPrice;
-
-                const modalTitle = document.getElementById("planModalTitle");
-                const orderPlanName = document.getElementById("orderPlanName");
-                const orderPlanSummary = document.getElementById("orderPlanSummary");
-                const orderCycleNote = document.getElementById("orderCycleNote");
-
-                if (modalTitle) modalTitle.textContent = "Deploy " + planName + " Plan";
-                if (orderPlanName) orderPlanName.value = planName;
-                if (orderPlanSummary) orderPlanSummary.textContent = planName + " Plan · " + price + (annual ? " XPF / year" : " XPF / month");
-                if (orderCycleNote) orderCycleNote.textContent = annual ? "Annual subscription · 15% discount included" : "Monthly subscription · Cancel or upgrade anytime";
-
+                updateModalPricing();
                 if (planModal) planModal.classList.add("show");
             });
         });
@@ -578,12 +591,38 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
             });
         }
 
+        // Users increment / decrement buttons
+        document.getElementById("btnMinusUser")?.addEventListener("click", () => {
+            const countInput = document.getElementById("planUsersCount");
+            if (countInput) {
+                let val = parseInt(countInput.value) || 1;
+                if (val > 1) {
+                    countInput.value = val - 1;
+                    updateModalPricing();
+                }
+            }
+        });
+
+        document.getElementById("btnPlusUser")?.addEventListener("click", () => {
+            const countInput = document.getElementById("planUsersCount");
+            if (countInput) {
+                let val = parseInt(countInput.value) || 1;
+                countInput.value = val + 1;
+                updateModalPricing();
+            }
+        });
+
+        document.getElementById("planUsersCount")?.addEventListener("input", () => {
+            updateModalPricing();
+        });
+
         // Start 15 Days Free Trial
         const trialBtn = document.getElementById("startTrialBtn");
         if (trialBtn) {
             trialBtn.addEventListener("click", async () => {
                 const subDomain = document.getElementById("planSubDomain")?.value?.trim();
                 const baseDomainId = document.getElementById("planBaseDomain")?.value;
+                const usersCount = parseInt(document.getElementById("planUsersCount")?.value) || 1;
                 if (!subDomain) {
                     notify("Please enter a subdomain first.");
                     return;
@@ -596,6 +635,7 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
                         instance_vals: {
                             base_domain_id: parseInt(baseDomainId) || 1,
                             sub_domain: subDomain,
+                            users_count: usersCount,
                             default_app_ids: []
                         }
                     });

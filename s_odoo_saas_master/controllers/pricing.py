@@ -82,6 +82,9 @@ class Pricing(http.Controller):
             'pricelist': pricelist,
             'pricelists': pricelists,
             'data': data,
+            'user_product_id': user_product.id if user_product else False,
+            'user_monthly_price': user_monthly_price,
+            'user_yearly_price': user_monthly_price * 12,
             'currency_symbol': pricelist.currency_id.symbol or 'XPF',
         }
         return request.render("s_odoo_saas_master.portal_pricing_page", values)
