@@ -534,6 +534,8 @@
     
     <record id="product_saas_user" model="product.product">
         <field name="name">SaaS User</field>
+        <field name="default_code">saas_user</field>
+        <field name="list_price">100.0</field>
         <field name="can_be_user_app" eval="True"/>
         <field name="type">service</field>
         <field name="uom_id" ref="product_uom_saas_user_month"/>
@@ -542,6 +544,24 @@
         <field name="website_sequence">1000</field>
         <field name="is_published" eval="True"/>
         <field name="is_saas_user" eval="True"/>
+    </record>
+
+    <record id="product_saas_plan_essential" model="product.product">
+        <field name="name">Essential</field>
+        <field name="default_code">Essential</field>
+        <field name="can_be_user_app" eval="False"/>
+        <field name="type">service</field>
+        <field name="list_price">14900.0</field>
+        <field name="is_published" eval="True"/>
+    </record>
+
+    <record id="product_saas_plan_growth" model="product.product">
+        <field name="name">Growth</field>
+        <field name="default_code">Growth</field>
+        <field name="can_be_user_app" eval="False"/>
+        <field name="type">service</field>
+        <field name="list_price">39900.0</field>
+        <field name="is_published" eval="True"/>
     </record>
 
 </odoo>

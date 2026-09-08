@@ -507,13 +507,18 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
 
     _initPricing() {
         const planModal = document.getElementById("orderPlanModal");
-        const userPriceMonthly = parseFloat(planModal?.dataset.userPriceMonthly || 1);
-        const userPriceYearly = parseFloat(planModal?.dataset.userPriceYearly || (userPriceMonthly * 12));
+        const userPriceMonthly = parseFloat(planModal?.dataset.userPriceMonthly || 100);
+        const userPriceYearly = parseFloat(planModal?.dataset.userPriceYearly || 1020);
+        const userPriceAnnualMonth = parseFloat(planModal?.dataset.userPriceAnnualMonth || 85);
+        const userPriceMonthlyFmt = planModal?.dataset.userPriceMonthlyFmt || "100";
+        const userPriceYearlyFmt = planModal?.dataset.userPriceYearlyFmt || "1,020";
+        const userPriceAnnualMonthFmt = planModal?.dataset.userPriceAnnualMonthFmt || "85";
         const currencySymbol = planModal?.dataset.currencySymbol || "XPF";
 
         const updateModalPricing = () => {
             const activePlanBtn = document.querySelector("[data-choose-plan].selected") || document.querySelector('[data-choose-plan="Essential"]');
             const planName = activePlanBtn ? activePlanBtn.dataset.choosePlan : "Essential";
+            const planProductId = activePlanBtn ? (activePlanBtn.dataset.productId || "") : "";
             const annual = document.querySelector('[data-billing="annual"]')?.classList.contains("active");
             const basePrice = activePlanBtn ? (annual ? activePlanBtn.dataset.annualPrice : activePlanBtn.dataset.monthlyPrice) : (annual ? "151,980" : "14,900");
 
@@ -521,19 +526,24 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
             let usersCount = countInput ? (parseInt(countInput.value) || 1) : 1;
             if (usersCount < 1) usersCount = 1;
 
-            const userUnitPrice = annual ? userPriceYearly : userPriceMonthly;
             const userPriceEl = document.getElementById("userPriceDisplay");
             if (userPriceEl) {
-                userPriceEl.textContent = userUnitPrice.toLocaleString() + " " + currencySymbol + " / user / " + (annual ? "year" : "month");
+                if (annual) {
+                    userPriceEl.textContent = userPriceAnnualMonthFmt + " " + currencySymbol + " / user / month (15% OFF)";
+                } else {
+                    userPriceEl.textContent = userPriceMonthlyFmt + " " + currencySymbol + " / user / month";
+                }
             }
 
             const modalTitle = document.getElementById("planModalTitle");
             const orderPlanName = document.getElementById("orderPlanName");
+            const orderPlanProductId = document.getElementById("orderPlanProductId");
             const orderPlanSummary = document.getElementById("orderPlanSummary");
             const orderCycleNote = document.getElementById("orderCycleNote");
 
             if (modalTitle) modalTitle.textContent = "Deploy " + planName + " Plan";
             if (orderPlanName) orderPlanName.value = planName;
+            if (orderPlanProductId) orderPlanProductId.value = planProductId;
             if (orderPlanSummary) {
                 orderPlanSummary.textContent = planName + " Plan · " + basePrice + " " + currencySymbol + " / " + (annual ? "year" : "month") + " (" + usersCount + " " + (usersCount === 1 ? "User" : "Users") + ")";
             }
@@ -554,7 +564,7 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
                         price.textContent = annual ? price.dataset.annual : price.dataset.monthly;
                     });
                     document.querySelectorAll("[data-period]").forEach(period => {
-                        period.textContent = annual ? "XPF / year" : "XPF / month";
+                        period.textContent = annual ? (currencySymbol + " / year") : (currencySymbol + " / month");
                     });
                     document.querySelectorAll(".annual-note").forEach(note => {
                         note.textContent = annual ? "15% annual discount applied" : "";

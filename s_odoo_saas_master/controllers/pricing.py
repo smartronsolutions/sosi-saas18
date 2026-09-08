@@ -24,8 +24,44 @@ class Pricing(http.Controller):
 
         return pricelist_context, pricelist, request.env['product.pricelist'].search([])
 
+    def _format_price(self, val):
+        if val is None:
+            return '0'
+        val = float(val)
+        if val.is_integer():
+            return f"{int(val):,}"
+        return f"{val:,.2f}"
+
+    def _get_plan_product(self, plan_name):
+        Product = request.env['product.product'].sudo()
+        prod = Product.search([('default_code', '=ilike', plan_name), ('active', '=', True)], limit=1)
+        if not prod:
+            prod = Product.search([('name', '=ilike', plan_name), ('active', '=', True)], limit=1)
+        if not prod:
+            try:
+                prod = request.env.ref(f's_odoo_saas_master.product_saas_plan_{plan_name.lower()}').sudo()
+            except Exception:
+                pass
+        return prod
+
+    def _get_user_product(self):
+        Product = request.env['product.product'].sudo()
+        prod = Product.search([('default_code', '=ilike', 'saas_user'), ('active', '=', True)], limit=1)
+        if not prod:
+            prod = Product.search([('is_saas_user', '=', True), ('active', '=', True)], limit=1)
+        if not prod:
+            try:
+                prod = request.env.ref('s_odoo_saas_master.product_saas_user').sudo()
+            except Exception:
+                pass
+        if not prod:
+            prod = Product.search([('name', 'ilike', 'SaaS User'), ('active', '=', True)], limit=1)
+        return prod
+
     @http.route([
-        '''/pricing'''
+        '''/pricing''',
+        '''/saas/pricing''',
+        '''/my/saas/pricing'''
     ], type='http', auth="public", website=True)
     def pricing(self, **post):
         pricelist_context, pricelist, pricelists = self._get_pricelist_context()
@@ -33,22 +69,40 @@ class Pricing(http.Controller):
         request.update_context(pricelist=pricelist.id, partner=partner)
 
         domains = request.env['saas.based.domain'].sudo().search([])
-
         ProductObj = request.env['product.product'].sudo()
+
+        # Dynamic Plan products lookup (Essential / Growth)
+        essential_product = self._get_plan_product('Essential')
+        essential_monthly_price = float(essential_product.list_price) if (essential_product and essential_product.list_price) else 14900.0
+        essential_annual_price = round(essential_monthly_price * 12 * 0.85, 2)
+
+        growth_product = self._get_plan_product('Growth')
+        growth_monthly_price = float(growth_product.list_price) if (growth_product and growth_product.list_price) else 39900.0
+        growth_annual_price = round(growth_monthly_price * 12 * 0.85, 2)
+
+        # Dynamic User product lookup
+        user_product = self._get_user_product()
+        user_monthly_price = float(user_product.list_price) if (user_product and user_product.list_price) else 100.0
+        user_annual_price = round(user_monthly_price * 12 * 0.85, 2)
+        user_annual_per_month = round(user_monthly_price * 0.85, 2)
+
+        essential_monthly_fmt = self._format_price(essential_monthly_price)
+        essential_annual_fmt = self._format_price(essential_annual_price)
+        growth_monthly_fmt = self._format_price(growth_monthly_price)
+        growth_annual_fmt = self._format_price(growth_annual_price)
+        user_monthly_fmt = self._format_price(user_monthly_price)
+        user_annual_fmt = self._format_price(user_annual_price)
+        user_annual_per_month_fmt = self._format_price(user_annual_per_month)
 
         data = {
             'user': {},
             'categs': []
         }
-        user_product = request.env.ref('s_odoo_saas_master.product_saas_user').sudo()
-        
-        # Calculate monthly price and ensure yearly is exactly 12x
-        user_monthly_price = pricelist.with_context(subscription_type='monthly')._get_product_price(user_product, 1, partner)
         
         data['user'].update({
-            'id': user_product.id,
+            'id': user_product.id if user_product else False,
             'monthly_price': user_monthly_price,
-            'yearly_price': user_monthly_price * 12,
+            'yearly_price': user_annual_price,
         })
         all_products = ProductObj.search([
             ('is_published', '=', True),
@@ -82,10 +136,27 @@ class Pricing(http.Controller):
             'pricelist': pricelist,
             'pricelists': pricelists,
             'data': data,
+            'currency_symbol': pricelist.currency_id.symbol or 'XPF',
+            # Plans
+            'essential_product': essential_product,
+            'essential_monthly_price': essential_monthly_price,
+            'essential_annual_price': essential_annual_price,
+            'essential_monthly_price_formatted': essential_monthly_fmt,
+            'essential_annual_price_formatted': essential_annual_fmt,
+            'growth_product': growth_product,
+            'growth_monthly_price': growth_monthly_price,
+            'growth_annual_price': growth_annual_price,
+            'growth_monthly_price_formatted': growth_monthly_fmt,
+            'growth_annual_price_formatted': growth_annual_fmt,
+            # Users
+            'user_product': user_product,
             'user_product_id': user_product.id if user_product else False,
             'user_monthly_price': user_monthly_price,
-            'user_yearly_price': user_monthly_price * 12,
-            'currency_symbol': pricelist.currency_id.symbol or 'XPF',
+            'user_annual_price': user_annual_price,
+            'user_annual_per_month': user_annual_per_month,
+            'user_monthly_price_formatted': user_monthly_fmt,
+            'user_annual_price_formatted': user_annual_fmt,
+            'user_annual_per_month_formatted': user_annual_per_month_fmt,
         }
         return request.render("s_odoo_saas_master.portal_pricing_page", values)
 
@@ -148,6 +219,20 @@ class Pricing(http.Controller):
         pricelist = request.website._get_current_pricelist()
         num_users = int(post.pop('num_users', 1))
         subscription_type = post.pop('price_by', 'yearly')
+        plan_name = post.pop('plan', 'Essential')
+        plan_product_id = post.pop('plan_product_id', False)
+
+        if not plan_product_id:
+            plan_product = self._get_plan_product(plan_name)
+            if plan_product:
+                plan_product_id = plan_product.id
+        else:
+            try:
+                plan_product_id = int(plan_product_id)
+            except (ValueError, TypeError):
+                plan_product = self._get_plan_product(plan_name)
+                plan_product_id = plan_product.id if plan_product else False
+
         app_ids = []
         for key, val in post.items():
             if key.startswith('app_') and val == 'on':
@@ -157,17 +242,14 @@ class Pricing(http.Controller):
         post['partner'] = request.env.user.partner_id
         post['domain_id'] = post.get('domain')
         post['users_count'] = num_users
+        post['plan_name'] = plan_name
+        post['plan_product_id'] = plan_product_id
         post['app_ids'] = app_ids
         post['subscription_type'] = subscription_type
         post['pricelist'] = pricelist
         
-        # Create order
+        # Create order (Plan line and User line are created with exact discounted prices)
         order = request.website.create_saas_order(post)
-        
-        # Ensure 12x price in cart for yearly
-        if subscription_type == 'yearly':
-            for line in order.order_line:
-                line.write({'price_unit': line.price_unit * 12})
                 
         request.session['sale_order_id'] = order.id
         return request.redirect('/shop/checkout?express=1')

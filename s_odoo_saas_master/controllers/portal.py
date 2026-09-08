@@ -120,13 +120,9 @@ class PortalInstance(CustomerPortal):
 
     @http.route(['/saas/pricing', '/my/saas/pricing'], type='http', auth="public", website=True)
     def portal_saas_pricing(self, **kw):
-        domains = request.env['saas.based.domain'].sudo().search([])
-        values = {
-            'page_name': 'saas_pricing',
-            'partner': request.env.user.partner_id if request.env.user and not request.env.user._is_public() else False,
-            'domains': domains,
-        }
-        return request.render("s_odoo_saas_master.portal_pricing_page", values)
+        from .pricing import Pricing
+        return Pricing().pricing(**kw)
+
 
     def _prepare_my_instances_values(self, sortby, filterby, domain=None, url="/my/saas/odoo-instances"):
         values = self._prepare_portal_layout_values()

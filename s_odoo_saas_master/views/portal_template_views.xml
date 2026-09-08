@@ -1361,8 +1361,11 @@
                             <h2>Essential</h2>
                             <p>For small teams getting started.</p>
                             <div class="price">
-                                <span data-monthly="14,900" data-annual="151,980">14,900</span>
-                                <small data-period="XPF / month">XPF / month</small>
+                                <span t-att-data-monthly="essential_monthly_price_formatted or '14,900'"
+                                      t-att-data-annual="essential_annual_price_formatted or '151,980'">
+                                    <t t-esc="essential_monthly_price_formatted or '14,900'"/>
+                                </span>
+                                <small data-period="XPF / month"><t t-esc="currency_symbol or 'XPF'"/> / month</small>
                             </div>
                             <div class="annual-note"></div>
                             <ul>
@@ -1372,7 +1375,14 @@
                                 <li>Daily backup</li>
                                 <li>Email support</li>
                             </ul>
-                            <button type="button" class="ghost" data-choose-plan="Essential" data-monthly-price="14,900" data-annual-price="151,980" style="width:100%">Choose Essential</button>
+                            <button type="button" class="ghost"
+                                    data-choose-plan="Essential"
+                                    t-att-data-product-id="essential_product.id if essential_product else ''"
+                                    t-att-data-monthly-price="essential_monthly_price_formatted or '14,900'"
+                                    t-att-data-annual-price="essential_annual_price_formatted or '151,980'"
+                                    t-att-data-monthly-raw="essential_monthly_price or 14900"
+                                    t-att-data-annual-raw="essential_annual_price or 151980"
+                                    style="width:100%">Choose Essential</button>
                         </div>
 
                         <div class="glass plan featured">
@@ -1380,8 +1390,11 @@
                             <h2>Growth</h2>
                             <p>For growing businesses and busy teams.</p>
                             <div class="price">
-                                <span data-monthly="39,900" data-annual="406,980">39,900</span>
-                                <small data-period="XPF / month">XPF / month</small>
+                                <span t-att-data-monthly="growth_monthly_price_formatted or '39,900'"
+                                      t-att-data-annual="growth_annual_price_formatted or '406,980'">
+                                    <t t-esc="growth_monthly_price_formatted or '39,900'"/>
+                                </span>
+                                <small data-period="XPF / month"><t t-esc="currency_symbol or 'XPF'"/> / month</small>
                             </div>
                             <div class="annual-note"></div>
                             <ul>
@@ -1392,7 +1405,14 @@
                                 <li>Preview environment</li>
                                 <li>Priority support</li>
                             </ul>
-                            <button type="button" class="primary" data-choose-plan="Growth" data-monthly-price="39,900" data-annual-price="406,980" style="width:100%">Choose Growth</button>
+                            <button type="button" class="primary"
+                                    data-choose-plan="Growth"
+                                    t-att-data-product-id="growth_product.id if growth_product else ''"
+                                    t-att-data-monthly-price="growth_monthly_price_formatted or '39,900'"
+                                    t-att-data-annual-price="growth_annual_price_formatted or '406,980'"
+                                    t-att-data-monthly-raw="growth_monthly_price or 39900"
+                                    t-att-data-annual-raw="growth_annual_price or 406980"
+                                    style="width:100%">Choose Growth</button>
                         </div>
 
                         <div class="glass plan">
@@ -1415,8 +1435,12 @@
 
                 <!-- Order / Free Trial Modal -->
                 <div class="modal" id="orderPlanModal"
-                     t-att-data-user-price-monthly="user_monthly_price or 1"
-                     t-att-data-user-price-yearly="user_yearly_price or 12"
+                     t-att-data-user-price-monthly="user_monthly_price or 100"
+                     t-att-data-user-price-yearly="user_annual_price or 1020"
+                     t-att-data-user-price-annual-month="user_annual_per_month or 85"
+                     t-att-data-user-price-monthly-fmt="user_monthly_price_formatted or '100'"
+                     t-att-data-user-price-yearly-fmt="user_annual_price_formatted or '1,020'"
+                     t-att-data-user-price-annual-month-fmt="user_annual_per_month_formatted or '85'"
                      t-att-data-currency-symbol="currency_symbol or 'XPF'">
                     <div class="glass modal-card" style="width:100%;max-width:520px;padding:24px">
                         <h2 id="planModalTitle">Deploy Essential Plan</h2>
@@ -1427,6 +1451,7 @@
                             <input type="hidden" name="buy_now_from_pricing" value="on"/>
                             <input type="hidden" name="price_by" id="orderPriceBy" value="monthly"/>
                             <input type="hidden" name="plan" id="orderPlanName" value="Essential"/>
+                            <input type="hidden" name="plan_product_id" id="orderPlanProductId" t-att-value="essential_product.id if essential_product else ''"/>
 
                             <div class="field" style="margin-bottom:14px">
                                 <label>CHOOSE YOUR SUBDOMAIN</label>
@@ -1452,7 +1477,7 @@
                                     <input type="number" name="num_users" id="planUsersCount" min="1" max="100" value="1" style="width:70px;text-align:center;padding:7px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.75);color:var(--ink);font-weight:800"/>
                                     <button type="button" class="ghost" id="btnPlusUser" style="width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;border-radius:8px;cursor:pointer">+</button>
                                     <span style="font-size:11px;color:var(--muted);margin-left:6px" id="userPriceDisplay">
-                                        <t t-esc="int(user_monthly_price or 1)"/> <t t-esc="currency_symbol or 'XPF'"/> / user / month
+                                        <t t-esc="user_monthly_price_formatted or '100'"/> <t t-esc="currency_symbol or 'XPF'"/> / user / month
                                     </span>
                                 </div>
                             </div>
@@ -1461,7 +1486,9 @@
                                 <label>PLAN &amp;amp; BILLING</label>
                                 <div class="option" style="padding:10px 0;border:0">
                                     <div>
-                                        <strong id="orderPlanSummary">Essential Plan · 14,900 XPF / month</strong>
+                                        <strong id="orderPlanSummary">
+                                            Essential Plan · <t t-esc="essential_monthly_price_formatted or '14,900'"/> <t t-esc="currency_symbol or 'XPF'"/> / month (1 User)
+                                        </strong>
                                         <small id="orderCycleNote">Monthly subscription · Cancel or upgrade anytime</small>
                                     </div>
                                     <span class="status">Instant Setup</span>
