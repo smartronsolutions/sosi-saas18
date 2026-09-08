@@ -1,0 +1,1419 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- Topbar Navigation Component -->
+    <template id="myodoo_topbar" name="MyOdoo Topbar">
+        <header class="topbar">
+            <div class="brand"><i></i>myodoo<span>.nc</span></div>
+            <nav class="nav">
+                <a t-attf-class="{{ 'active' if page_name == 'saas_dashboard' else '' }}" href="/my">Dashboard</a>
+                <a t-attf-class="{{ 'active' if page_name in ('instance', 'instance_detail') else '' }}" href="/my/saas/odoo-instances">My Instances</a>
+                <a t-attf-class="{{ 'active' if page_name == 'saas_settings' else '' }}" href="/my/saas/settings">Settings</a>
+                <a t-attf-class="{{ 'active' if page_name == 'saas_pricing' else '' }}" href="/saas/pricing">Pricing</a>
+            </nav>
+            <t t-if="request.env.user and not request.env.user._is_public()">
+                <a href="/my/saas/settings" class="user-pill" title="Workspace Settings">
+                    <span t-esc="request.env.user.partner_id.name"/>
+                </a>
+                <a href="/web/session/logout?redirect=/" class="logout-btn" title="Sign Out">Sign Out</a>
+            </t>
+        </header>
+    </template>
+
+    <!-- Customer Dashboard: /my and /my/home -->
+    <template id="portal_customer_dashboard" name="Customer Portal Dashboard">
+        <t t-call="portal.frontend_layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="title">Hosting Overview — myodoo.nc</t>
+            
+            <div class="myodoo-portal-root">
+                <t t-call="s_odoo_saas_master.myodoo_topbar"/>
+
+                <main class="page">
+                    <div class="head">
+                        <div>
+                            <span class="eyebrow">Customer Portal</span>
+                            <h1>Hosting Overview</h1>
+                            <div class="sub">Welcome back, <t t-esc="partner.name"/>. Monitor your instances, subscription and deployments.</div>
+                        </div>
+                        <div class="actions">
+                            <a href="/my/saas/settings#billing" class="ghost" style="text-decoration:none">Download Usage</a>
+                            <a href="/saas/pricing" class="primary" style="text-decoration:none">+ Add Instance</a>
+                        </div>
+                    </div>
+
+                    <section class="admin-kpis">
+                        <div class="glass admin-kpi">
+                            <small>My Instances</small>
+                            <strong t-esc="total_instances"/>
+                            <em><t t-esc="online_instances"/> live &amp;middot; <t t-esc="total_instances - online_instances"/> offline</em>
+                        </div>
+                        <div class="glass admin-kpi">
+                            <small>Instances Running</small>
+                            <strong t-esc="str(online_instances) + ' / ' + str(total_instances)"/>
+                            <em>All environments online</em>
+                        </div>
+                        <div class="glass admin-kpi">
+                            <small>Storage</small>
+                            <strong t-esc="str(round(total_instances * 5.4, 1) if total_instances else 0.0) + ' GB'"/>
+                            <em>of <t t-esc="(total_instances * 10) if total_instances else 20"/> GB included</em>
+                        </div>
+                        <div class="glass admin-kpi">
+                            <small>Active Workers</small>
+                            <strong t-esc="str(online_instances * 2) + ' / ' + str(total_instances * 2 if total_instances else 2)"/>
+                            <em>Workers available</em>
+                        </div>
+                        <div class="glass admin-kpi">
+                            <small>Plan Renewal</small>
+                            <t t-if="days_left is not None and days_left &gt;= 0">
+                                <strong t-esc="str(days_left) + ' days'"/>
+                                <em>Renews <t t-esc="earliest_expiry.strftime('%d %b %Y')"/></em>
+                            </t>
+                            <t t-else="">
+                                <strong>Active</strong>
+                                <em>Auto-renew enabled</em>
+                            </t>
+                        </div>
+                        <div class="glass admin-kpi">
+                            <small>Instance Uptime</small>
+                            <strong>99.98%</strong>
+                            <em>Last 30 days</em>
+                        </div>
+                    </section>
+
+                    <div class="admin-layout">
+                        <section class="glass panel">
+                            <div class="section-title">
+                                <h2>My Environments</h2>
+                                <div class="actions">
+                                    <button class="ghost">Odoo 18</button>
+                                    <button class="ghost">All Statuses</button>
+                                </div>
+                            </div>
+                            <div class="instance-table">
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Instance</th>
+                                            <th>Status</th>
+                                            <th>Version</th>
+                                            <th>Stage</th>
+                                            <th>Storage</th>
+                                            <th>Workers</th>
+                                            <th>Last Backup</th>
+                                            <th>Expires</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="not instances">
+                                            <tr>
+                                                <td colspan="9" class="empty-state">
+                                                    <h3>No instances yet</h3>
+                                                    <p>Get started by deploying your first high-performance Odoo environment.</p>
+                                                    <a href="/saas/pricing" class="primary" style="text-decoration:none">+ Create Instance</a>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="instances" t-as="inst">
+                                            <tr>
+                                                <td class="client">
+                                                    <t t-esc="inst.name"/>
+                                                    <small t-esc="inst.url or (inst.name + '.' + inst.based_domain_id.name)"/>
+                                                </td>
+                                                <td>
+                                                    <span t-attf-class="status {{ 'offline' if inst.operation_state == 'stop' else '' }}">
+                                                        <t t-esc="'Online' if inst.operation_state == 'run' else 'Stopped'"/>
+                                                    </span>
+                                                </td>
+                                                <td><t t-esc="inst.odoo_version_id.name"/></td>
+                                                <td><span class="badge">Live</span></td>
+                                                <td>
+                                                    5.4 / 20 GB
+                                                    <div class="mini-bar"><i style="width:27%"></i></div>
+                                                </td>
+                                                <td>2 / 2</td>
+                                                <td>
+                                                    <t t-if="inst.backup_ids">
+                                                        <t t-esc="inst.backup_ids[0].datetime.strftime('%d %b, %H:%M') if inst.backup_ids[0].datetime else 'Recent'"/>
+                                                    </t>
+                                                    <t t-else="">Ready</t>
+                                                </td>
+                                                <td class="expiry">
+                                                    <t t-if="inst.expiration_date">
+                                                        <t t-esc="inst.expiration_date.strftime('%d %b %Y')"/>
+                                                        <small><t t-esc="(inst.expiration_date - today).days"/> days left</small>
+                                                    </t>
+                                                    <t t-else="">
+                                                        Active
+                                                        <small>No expiry</small>
+                                                    </t>
+                                                </td>
+                                                <td>
+                                                    <a t-attf-href="/my/saas/odoo-instance/{{inst.id}}" class="ghost" style="text-decoration:none">Manage</a>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <aside class="sidebar-stack">
+                            <section class="glass side-panel">
+                                <h3>Service Health</h3>
+                                <div class="health-row"><span>My Live Instance</span><strong class="ok">Operational</strong></div>
+                                <div class="health-row"><span>Database</span><strong class="ok">Operational</strong></div>
+                                <div class="health-row"><span>Current Build</span><strong class="ok">Ready</strong></div>
+                                <div class="health-row"><span>Backup Service</span><strong class="ok">Operational</strong></div>
+                                <div class="health-row"><span>GitHub Connection</span><strong class="ok">Connected</strong></div>
+                                <div class="health-row"><span>Email Relay</span><strong class="ok">Operational</strong></div>
+                            </section>
+                            <section class="glass side-panel">
+                                <h3>Account Notices</h3>
+                                <div class="alert-row">
+                                    <strong>Storage usage healthy</strong>
+                                    <small>Your environments are using less than 40% of plan capacity.</small>
+                                </div>
+                                <div class="alert-row">
+                                    <strong>Daily automated backups active</strong>
+                                    <small>Restorable snapshots are captured every night at 04:00 UTC.</small>
+                                </div>
+                                <div class="alert-row">
+                                    <strong>SSL Certificates Auto-renew</strong>
+                                    <small>Let's Encrypt certificates are automatically renewed 30 days before expiration.</small>
+                                </div>
+                            </section>
+                            <section class="glass side-panel">
+                                <h3>Quick Actions</h3>
+                                <div class="quick-grid">
+                                    <button onclick="location.href='/saas/pricing'">Add Instance</button>
+                                    <button onclick="location.href='/my/saas/odoo-instances'">My Instances</button>
+                                    <button onclick="location.href='/my/saas/settings'">Manage Plan</button>
+                                    <button onclick="location.href='/my/saas/settings#github'">GitHub Config</button>
+                                    <button onclick="location.href='/my/saas/settings#security'">Security</button>
+                                    <button onclick="location.href='/my/saas/settings#billing'">Billing</button>
+                                </div>
+                            </section>
+                        </aside>
+                    </div>
+
+                    <section class="ops-grid">
+                        <div class="glass ops-card">
+                            <h3>Deployments &amp; Builds</h3>
+                            <div class="ops-item"><span>Builds this month</span><strong>14</strong></div>
+                            <div class="ops-item"><span>Successful</span><strong class="ok">13</strong></div>
+                            <div class="ops-item"><span>In progress</span><strong>0</strong></div>
+                            <div class="ops-item"><span>Average build time</span><strong>4m 12s</strong></div>
+                            <button class="ghost" onclick="location.href='/my/saas/odoo-instances'">View My Builds</button>
+                        </div>
+                        <div class="glass ops-card">
+                            <h3>Backups &amp; Recovery</h3>
+                            <div class="ops-item"><span>Automatic backups</span><strong>Daily</strong></div>
+                            <div class="ops-item"><span>Manual backups</span><strong t-esc="len(recent_backups)"/></div>
+                            <div class="ops-item"><span>Latest completed</span><strong>Today, 04:00</strong></div>
+                            <div class="ops-item"><span>Backup storage</span><strong>18.4 GB</strong></div>
+                            <button class="ghost" onclick="location.href='/my/saas/odoo-instances'">Manage Backups</button>
+                        </div>
+                        <div class="glass ops-card">
+                            <h3>Version &amp; Upgrade</h3>
+                            <div class="ops-item"><span>Current version</span><strong>Odoo 18</strong></div>
+                            <div class="ops-item"><span>Edition</span><strong>Community</strong></div>
+                            <div class="ops-item"><span>Upgrade target</span><strong>Odoo 19</strong></div>
+                            <div class="ops-item"><span>Upgrade test</span><strong>Ready</strong></div>
+                            <button class="ghost" onclick="location.href='/my/saas/odoo-instances'">Plan Upgrade</button>
+                        </div>
+                        <div class="glass ops-card">
+                            <h3>Domains &amp; SSL</h3>
+                            <div class="ops-item"><span>Platform domain</span><strong>myodoo.nc</strong></div>
+                            <div class="ops-item"><span>SSL status</span><strong class="ok">Active</strong></div>
+                            <div class="ops-item"><span>DNS status</span><strong class="ok">Verified</strong></div>
+                            <div class="ops-item"><span>Certificates</span><strong>Automated</strong></div>
+                            <button class="ghost" onclick="location.href='/my/saas/odoo-instances'">Manage Domains</button>
+                        </div>
+                        <div class="glass ops-card">
+                            <h3>GitHub &amp; Access</h3>
+                            <div class="ops-item"><span>Git integration</span><strong class="ok">Ready</strong></div>
+                            <div class="ops-item"><span>Deploy on push</span><strong>Supported</strong></div>
+                            <div class="ops-item"><span>Custom Addons</span><strong>/mnt/extra-addons</strong></div>
+                            <div class="ops-item"><span>Branch syncing</span><strong>Automated</strong></div>
+                            <button class="ghost" onclick="location.href='/my/saas/settings#github'">Manage GitHub</button>
+                        </div>
+                        <div class="glass ops-card">
+                            <h3>Recent Activity</h3>
+                            <t t-if="recent_messages">
+                                <t t-foreach="recent_messages[:3]" t-as="msg">
+                                    <div class="activity-row">
+                                        <strong><t t-esc="msg.subject or 'System Notification'"/></strong>
+                                        <small><t t-esc="msg.date.strftime('%d %b, %H:%M')"/></small>
+                                    </div>
+                                </t>
+                            </t>
+                            <t t-else="">
+                                <div class="activity-row">
+                                    <strong>Environment active</strong>
+                                    <small>Instance running stably</small>
+                                </div>
+                            </t>
+                            <button class="ghost" onclick="location.href='/my/saas/odoo-instances'">View All Activity</button>
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </t>
+    </template>
+
+    <!-- My Instances: /my/saas/odoo-instances -->
+    <template id="portal_my_instances" name="My Instances">
+        <t t-call="portal.frontend_layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="title">My Instances — myodoo.nc</t>
+
+            <div class="myodoo-portal-root">
+                <t t-call="s_odoo_saas_master.myodoo_topbar"/>
+
+                <main class="page">
+                    <div class="head">
+                        <div>
+                            <span class="eyebrow">Hosting Workspace</span>
+                            <h1>My Instances</h1>
+                            <div class="sub">Open an instance to manage its code, environments, builds, backups and domains.</div>
+                        </div>
+                        <div class="searchbar">
+                            <input id="instanceSearch" placeholder="Search instances..."/>
+                            <a href="/saas/pricing" class="primary" style="text-decoration:none">+ Create Instance</a>
+                        </div>
+                    </div>
+
+                    <section class="instance-list" id="instanceList">
+                        <t t-if="not instances">
+                            <div class="glass panel empty-state">
+                                <h3>No instances found</h3>
+                                <p>You do not have any active instances yet.</p>
+                                <a href="/saas/pricing" class="primary" style="text-decoration:none">+ Create First Instance</a>
+                            </div>
+                        </t>
+                        <t t-foreach="instances" t-as="inst">
+                            <article class="glass instance-list-card" t-att-data-name="(inst.name or '') + ' ' + (inst.odoo_version_id.name or '')">
+                                <div class="instance-identity">
+                                    <div class="app-icon"><t t-esc="(inst.name or 'D')[:1].upper()"/></div>
+                                    <div>
+                                        <h3 t-esc="inst.name"/>
+                                        <p><t t-esc="inst.url or (inst.name + '.' + inst.based_domain_id.name)"/> &amp;middot; <t t-esc="inst.odoo_version_id.name"/></p>
+                                    </div>
+                                </div>
+                                <div class="list-metric">
+                                    <small>Status</small>
+                                    <strong>
+                                        <span t-attf-class="status {{ 'offline' if inst.operation_state == 'stop' else '' }}">
+                                            <t t-esc="'Online' if inst.operation_state == 'run' else 'Stopped'"/>
+                                        </span>
+                                    </strong>
+                                </div>
+                                <div class="list-metric">
+                                    <small>Storage</small>
+                                    <strong>5.4 / 20 GB</strong>
+                                </div>
+                                <div class="list-metric">
+                                    <small>Workers</small>
+                                    <strong>2 Active</strong>
+                                </div>
+                                <div class="list-metric">
+                                    <small>Plan expiry</small>
+                                    <strong>
+                                        <t t-if="inst.expiration_date"><t t-esc="inst.expiration_date.strftime('%d %b %Y')"/></t>
+                                        <t t-else="">Active</t>
+                                    </strong>
+                                </div>
+                                <a class="open-link" t-attf-href="/my/saas/odoo-instance/{{inst.id}}">Open Instance</a>
+                            </article>
+                        </t>
+                    </section>
+                </main>
+                <div class="toast" id="toast"></div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Instance Detail Page: /my/saas/odoo-instance/<id> -->
+    <template id="portal_instance_page" name="Instance Detail Page">
+        <t t-call="portal.frontend_layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="title"><t t-esc="instance.name"/> — myodoo.nc</t>
+
+            <div class="myodoo-portal-root">
+                <t t-call="s_odoo_saas_master.myodoo_topbar"/>
+
+                <main class="page">
+                    <input type="hidden" id="o_instance_id" t-att-value="instance.id"/>
+                    <input type="hidden" id="instanceUrl" t-att-value="instance.url"/>
+
+                    <a href="/my/saas/odoo-instances" style="display:inline-block;margin-bottom:14px;color:var(--deep);text-decoration:none;font-size:11px;font-weight:800">&amp;larr; Back to My Instances</a>
+
+                    <section class="glass workspace-head">
+                        <div class="app-icon" id="detailIcon"><t t-esc="(instance.name or 'D')[:1].upper()"/></div>
+                        <div>
+                            <h1 id="detailName" t-esc="instance.name"/>
+                            <p id="detailMeta"><t t-esc="instance.url"/> &amp;middot; <t t-esc="instance.odoo_version_id.name"/> &amp;middot; Growth Plan</p>
+                        </div>
+                        <span t-attf-class="state-pill {{ 'suspended' if instance.operation_state == 'stop' else '' }}" id="instanceState">
+                            <t t-esc="'Running' if instance.operation_state == 'run' else 'Suspended'"/>
+                        </span>
+                        <div class="actions">
+                            <button class="ghost" data-confirm="restart">Restart</button>
+                            <button class="ghost" data-action="backup">Create Backup</button>
+                            <button t-attf-class="primary dark {{ 'hidden' if instance.github_connected else '' }}" data-action="github" id="connectGithubBtn">Connect GitHub</button>
+                            <button t-attf-class="ghost {{ '' if instance.github_connected else 'hidden' }}" id="disconnectGithub" title="Disconnect Repository">GitHub Connected</button>
+                            <a t-att-href="instance.url" target="_blank" class="primary" style="text-decoration:none">Open Odoo</a>
+                        </div>
+                    </section>
+
+                    <!-- 14 Mockup Tabs -->
+                    <nav class="glass detail-tabs">
+                        <button class="active" data-tab="overview">Overview</button>
+                        <button data-tab="environments">Branches</button>
+                        <button data-tab="history">History</button>
+                        <button data-tab="builds">Builds</button>
+                        <button data-tab="mails">Mails</button>
+                        <button data-tab="monitor">Monitor</button>
+                        <button data-tab="logs">Logs</button>
+                        <button data-tab="backups">Backups</button>
+                        <button data-tab="editor">Editor</button>
+                        <button data-tab="upgrade">Upgrade</button>
+                        <button data-tab="tools">Tools</button>
+                        <button data-tab="domains">Domains</button>
+                        <button data-tab="access">Access</button>
+                        <button data-tab="configuration">Settings</button>
+                    </nav>
+
+                    <!-- Tab 1: Overview -->
+                    <section class="tab-pane active" id="overview">
+                        <div class="glass control-center">
+                            <h2>Instance Controls</h2>
+                            <p>Manage the lifecycle of this instance. Confirmation is required for service-impacting actions.</p>
+                            <div class="control-grid">
+                                <button class="control-btn accent" data-confirm="start">
+                                    <b>Start Instance</b>
+                                    <small>Start Odoo, workers and web services.</small>
+                                </button>
+                                <button class="control-btn danger" data-confirm="suspend">
+                                    <b>Suspend Instance</b>
+                                    <small>Stop public access and background workers.</small>
+                                </button>
+                                <button class="control-btn" data-confirm="restart">
+                                    <b>Restart Services</b>
+                                    <small>Restart Odoo HTTP and scheduled workers.</small>
+                                </button>
+                                <button class="control-btn" data-confirm="redeploy">
+                                    <b>Redeploy Latest</b>
+                                    <small>Pull Git revision and reload instance.</small>
+                                </button>
+                                <button class="control-btn" data-action="backup">
+                                    <b>Create Backup</b>
+                                    <small>Take a manual database and filestore backup.</small>
+                                </button>
+                                <button class="control-btn" data-tab-jump="domains">
+                                    <b>Add Domain</b>
+                                    <small>Connect a custom domain and enable SSL.</small>
+                                </button>
+                                <button class="control-btn" data-tab-jump="configuration">
+                                    <b>Resources</b>
+                                    <small>Change workers and deployment settings.</small>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="detail-grid">
+                            <div class="glass detail-card">
+                                <small>Instance Status</small>
+                                <strong t-esc="'Online' if instance.operation_state == 'run' else 'Stopped'"/>
+                                <span class="healthy">All services healthy</span>
+                            </div>
+                            <div class="glass detail-card">
+                                <small>Storage</small>
+                                <strong>5.4 / 20 GB</strong>
+                                <div class="mini-bar" style="width:100%"><i style="width:27%"></i></div>
+                            </div>
+                            <div class="glass detail-card">
+                                <small>Workers</small>
+                                <strong>2 Active</strong>
+                                <span class="healthy">2 of 2 running</span>
+                            </div>
+                            <div class="glass detail-card">
+                                <small>Plan Renewal</small>
+                                <t t-if="days_left is not None and days_left &gt;= 0">
+                                    <strong t-esc="str(days_left) + ' Days'"/>
+                                    <span class="healthy" t-esc="instance.expiration_date.strftime('%d %b %Y')"/>
+                                </t>
+                                <t t-else="">
+                                    <strong>Active</strong>
+                                    <span class="healthy">No expiry</span>
+                                </t>
+                            </div>
+                        </div>
+
+                        <div class="wide-grid">
+                            <div class="glass github-box">
+                                <h2>Source Code &amp; GitHub</h2>
+                                <p>Connect a repository to automatically create builds when code is pushed. Custom addons are cloned directly into your container's extra-addons path.</p>
+                                <div class="repo-line">
+                                    <t t-if="instance.github_connected">
+                                        <div>
+                                            <strong t-esc="instance.github_repo_url"/>
+                                            <div class="sub">Branch: <b><t t-esc="instance.github_branch or 'main'"/></b> &amp;middot; <t t-if="instance.last_redeploy_date">Redeployed <t t-esc="instance.last_redeploy_date.strftime('%d %b, %H:%M')"/></t></div>
+                                        </div>
+                                        <div class="actions">
+                                            <button class="ghost" data-confirm="redeploy">Pull &amp;amp; Redeploy</button>
+                                            <button class="ghost" id="disconnectGithub">Disconnect</button>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <div>
+                                            <strong>No repository connected</strong>
+                                            <div class="sub">Connect your GitHub repository to deploy custom modules.</div>
+                                        </div>
+                                        <button class="primary dark" data-action="github">Connect GitHub</button>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <div class="glass side-panel">
+                                <h3>Instance Details</h3>
+                                <div class="health-row"><span>Odoo version</span><strong><t t-esc="instance.odoo_version_id.name"/></strong></div>
+                                <div class="health-row"><span>Edition</span><strong>Community</strong></div>
+                                <div class="health-row"><span>Database</span><strong>PostgreSQL 16</strong></div>
+                                <div class="health-row"><span>Server IP</span><strong><t t-esc="managing_ip or '127.0.0.1'"/></strong></div>
+                                <div class="health-row"><span>Created</span><strong><t t-esc="instance.create_date.strftime('%d %b %Y') if instance.create_date else 'Active'"/></strong></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 2: Branches -->
+                    <section class="tab-pane" id="environments">
+                        <div class="head">
+                            <div>
+                                <h2 style="margin:0">Branches &amp; Environments</h2>
+                                <div class="sub">Move changes through Sandbox, Preview and Live safely.</div>
+                            </div>
+                            <button class="primary" data-action="github">+ Connect Branch</button>
+                        </div>
+                        <div class="glass branch-list">
+                            <div class="branch-detail">
+                                <i class="dot"></i>
+                                <div class="name">
+                                    <t t-esc="instance.github_branch or 'main'"/>
+                                    <small>Live &amp;middot; Production Branch</small>
+                                </div>
+                                <span>2 workers</span>
+                                <span>5.4 GB</span>
+                                <div class="actions">
+                                    <a t-att-href="instance.url" target="_blank" class="primary" style="text-decoration:none">Connect</a>
+                                    <button class="ghost" data-confirm="redeploy">Pull &amp;amp; Redeploy</button>
+                                </div>
+                            </div>
+                            <div class="branch-detail">
+                                <i class="dot"></i>
+                                <div class="name">staging<small>Preview &amp;middot; Staging tests</small></div>
+                                <span>1 worker</span>
+                                <span>3.1 GB</span>
+                                <div class="actions">
+                                    <button class="ghost" data-confirm="redeploy">Refresh</button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 3: History -->
+                    <section class="tab-pane" id="history">
+                        <div class="glass panel">
+                            <div class="section-title">
+                                <h2>Activity &amp; Deployment History</h2>
+                                <button class="ghost" onclick="location.reload()">Refresh Activity</button>
+                            </div>
+                            <div class="timeline">
+                                <t t-if="recent_messages">
+                                    <t t-foreach="recent_messages" t-as="msg">
+                                        <div class="timeline-item">
+                                            <strong><t t-esc="msg.subject or 'System Log'"/></strong>
+                                            <p><t t-out="msg.body or 'Operation recorded.'"/></p>
+                                            <time><t t-esc="msg.date.strftime('%d %b %Y, %H:%M')"/></time>
+                                        </div>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <div class="timeline-item">
+                                        <strong>Instance initialized</strong>
+                                        <p>Environment configured and ready for production use.</p>
+                                        <time>Active</time>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 4: Builds -->
+                    <section class="tab-pane" id="builds">
+                        <div class="glass panel">
+                            <div class="section-title">
+                                <h2>Build History</h2>
+                                <div class="actions">
+                                    <button class="primary" data-confirm="redeploy">+ Trigger Build</button>
+                                </div>
+                            </div>
+                            <div class="instance-table">
+                                <table class="backup-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Build</th>
+                                            <th>Environment</th>
+                                            <th>Branch</th>
+                                            <th>Status</th>
+                                            <th>Started</th>
+                                            <th>Duration</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>#101</td>
+                                            <td>Production</td>
+                                            <td><t t-esc="instance.github_branch or 'main'"/></td>
+                                            <td><span class="status">Successful</span></td>
+                                            <td>Today, 11:24</td>
+                                            <td>3m 42s</td>
+                                            <td>
+                                                <a t-att-href="instance.url" target="_blank" class="ghost" style="text-decoration:none">Connect</a>
+                                                <button class="ghost" data-confirm="redeploy">Rebuild</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 5: Mails -->
+                    <section class="tab-pane" id="mails">
+                        <div class="head">
+                            <div>
+                                <h2 style="margin:0">Mail Catcher</h2>
+                                <div class="sub">Preview and Sandbox only &amp;middot; no messages are delivered externally.</div>
+                            </div>
+                            <button class="ghost">Clear Mailbox</button>
+                        </div>
+                        <div class="glass mail-list">
+                            <div class="mail-items">
+                                <div class="mail-item active">
+                                    <strong>Welcome to Odoo SaaS</strong>
+                                    <small>system@myodoo.nc &amp;middot; 5 min ago</small>
+                                </div>
+                            </div>
+                            <div class="mail-preview">
+                                <span class="badge">Intercepted</span>
+                                <h3>Welcome to your dedicated Odoo instance!</h3>
+                                <div class="sub">To: <t t-esc="instance.partner_id.email or 'admin@example.com'"/></div>
+                                <p style="font-size:11px;line-height:1.7;margin-top:20px">
+                                    Your Odoo 18 container environment has been deployed successfully.<br/><br/>
+                                    Instance URL: <b t-esc="instance.url"/><br/>
+                                    Database: <b t-esc="instance.db_name or 'odoo'"/>
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 6: Monitor -->
+                    <section class="tab-pane" id="monitor">
+                        <div class="head">
+                            <div>
+                                <h2 style="margin:0">Performance Monitor</h2>
+                                <div class="sub">Last 24 hours &amp;middot; timezone UTC</div>
+                            </div>
+                            <div class="actions">
+                                <button class="ghost">24 hours</button>
+                                <button class="ghost">UTC</button>
+                            </div>
+                        </div>
+                        <div class="metric-charts">
+                            <div class="glass chart-card">
+                                <h3>Worker Load</h3>
+                                <div class="bars">
+                                    <i style="height:28%"></i><i style="height:36%"></i><i style="height:31%"></i><i style="height:58%"></i><i style="height:44%"></i>
+                                    <i style="height:72%"></i><i style="height:49%"></i><i style="height:39%"></i><i style="height:52%"></i><i style="height:33%"></i>
+                                </div>
+                                <div class="sub" style="margin-top:9px">Average 42% &amp;middot; Peak 72%</div>
+                            </div>
+                            <div class="glass chart-card">
+                                <h3>Storage Growth</h3>
+                                <div class="bars">
+                                    <i style="height:55%"></i><i style="height:57%"></i><i style="height:59%"></i><i style="height:62%"></i><i style="height:64%"></i>
+                                    <i style="height:67%"></i><i style="height:70%"></i><i style="height:73%"></i><i style="height:76%"></i><i style="height:80%"></i>
+                                </div>
+                                <div class="sub" style="margin-top:9px">Database 2.1 GB &amp;middot; Filestore 3.3 GB</div>
+                            </div>
+                            <div class="glass chart-card">
+                                <h3>HTTP Requests</h3>
+                                <div class="bars">
+                                    <i style="height:22%"></i><i style="height:48%"></i><i style="height:35%"></i><i style="height:66%"></i><i style="height:81%"></i>
+                                    <i style="height:62%"></i><i style="height:44%"></i><i style="height:70%"></i><i style="height:55%"></i><i style="height:38%"></i>
+                                </div>
+                                <div class="sub" style="margin-top:9px">14,200 requests &amp;middot; 180 ms average</div>
+                            </div>
+                            <div class="glass chart-card">
+                                <h3>Email Traffic</h3>
+                                <div class="bars">
+                                    <i style="height:12%"></i><i style="height:20%"></i><i style="height:30%"></i><i style="height:18%"></i><i style="height:45%"></i>
+                                    <i style="height:32%"></i><i style="height:25%"></i><i style="height:38%"></i><i style="height:22%"></i><i style="height:28%"></i>
+                                </div>
+                                <div class="sub" style="margin-top:9px">84 sent &amp;middot; 0 bounced</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 7: Logs -->
+                    <section class="tab-pane" id="logs">
+                        <div class="head">
+                            <div>
+                                <h2 style="margin:0">Live Container Logs</h2>
+                                <div class="sub">odoo_<t t-esc="instance.technical_name"/> container output</div>
+                            </div>
+                            <div class="actions">
+                                <button class="ghost" data-action="refresh-logs">Refresh Logs</button>
+                            </div>
+                        </div>
+                        <div class="console">
+                            Loading live container logs...
+                        </div>
+                    </section>
+
+                    <!-- Tab 8: Backups -->
+                    <section class="tab-pane" id="backups">
+                        <div class="glass panel">
+                            <div class="section-title">
+                                <h2>Backups &amp; Recovery</h2>
+                                <div class="actions">
+                                    <button class="primary" data-action="backup">Create Manual Backup</button>
+                                </div>
+                            </div>
+                            <div class="instance-table">
+                                <table class="backup-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Created</th>
+                                            <th>File</th>
+                                            <th>Size</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="not instance.backup_ids">
+                                            <tr>
+                                                <td colspan="5" class="empty-state">
+                                                    <p>No backups created yet. Click above to create your first backup.</p>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="instance.backup_ids" t-as="bk">
+                                            <tr>
+                                                <td><t t-esc="bk.datetime.strftime('%d %b %Y, %H:%M') if bk.datetime else 'Recent'"/></td>
+                                                <td><t t-esc="bk.name"/></td>
+                                                <td><t t-esc="str(round(bk.file_size / 1024 / 1024, 2)) + ' MB' if bk.file_size else 'N/A'"/></td>
+                                                <td><span class="status">Ready</span></td>
+                                                <td>
+                                                    <a t-attf-href="/my/instance/{{instance.id}}/download-backup/{{bk.id}}" class="ghost" style="text-decoration:none">Download</a>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="sub" style="padding:12px 16px">Automated daily backups run at 04:00 UTC. Maximum retention: <t t-esc="instance.backup_limit"/> snapshots.</div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 9: Editor -->
+                    <section class="tab-pane" id="editor">
+                        <div class="head">
+                            <div>
+                                <h2 style="margin:0">Online Addons Structure</h2>
+                                <div class="sub">/mnt/extra-addons &amp;middot; custom addons loaded in container</div>
+                            </div>
+                            <div class="actions">
+                                <button class="primary" data-confirm="redeploy">Commit &amp;amp; Redeploy</button>
+                            </div>
+                        </div>
+                        <div class="editor-shell">
+                            <div class="file-tree">
+                                &amp;#9662; custom-addons<br/>
+                                &amp;nbsp;&amp;nbsp;&amp;#9662; custom_repo<br/>
+                                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; __manifest__.py<br/>
+                                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; models.py<br/>
+                                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; views.xml<br/>
+                                &amp;#9656; standard_addons<br/>
+                                &amp;#9662; logs<br/>
+                                &amp;nbsp;&amp;nbsp; odoo.log
+                            </div>
+                            <div class="code-editor">
+<span class="kw">from</span> odoo <span class="kw">import</span> models, fields
+
+<span class="kw">class</span> CustomExtension(models.Model):
+    _inherit = <span class="str">'res.partner'</span>
+
+    custom_field = fields.Char(
+        string=<span class="str">'Custom Field'</span>
+    )
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 10: Upgrade -->
+                    <section class="tab-pane" id="upgrade">
+                        <div class="wide-grid">
+                            <div class="glass form">
+                                <h2>Upgrade Center</h2>
+                                <p>Test a newer Odoo version safely before upgrading the live environment.</p>
+                                <div class="upgrade-step">
+                                    <span class="step-num">1</span>
+                                    <div>
+                                        <strong>Select target version</strong>
+                                        <small>Current version: <t t-esc="instance.odoo_version_id.name"/></small>
+                                        <div class="field" style="margin-top:10px">
+                                            <select>
+                                                <option>Odoo 19</option>
+                                                <option>Odoo 18</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="upgrade-step">
+                                    <span class="step-num">2</span>
+                                    <div>
+                                        <strong>Run upgrade test</strong>
+                                        <small>Create an isolated upgraded copy and review the result.</small>
+                                    </div>
+                                </div>
+                                <div class="upgrade-step">
+                                    <span class="step-num">3</span>
+                                    <div>
+                                        <strong>Validate and schedule</strong>
+                                        <small>Choose a maintenance window after successful testing.</small>
+                                    </div>
+                                </div>
+                                <button class="primary" onclick="notify('Upgrade test requested.')">Start Upgrade Test</button>
+                            </div>
+                            <div class="glass side-panel">
+                                <h3>Upgrade Readiness</h3>
+                                <div class="health-row"><span>Latest backup</span><strong class="ok">Ready</strong></div>
+                                <div class="health-row"><span>Git status</span><strong class="ok">Clean</strong></div>
+                                <div class="health-row"><span>Target</span><strong>Odoo 19</strong></div>
+                                <div class="health-row"><span>Test status</span><strong>Ready</strong></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 11: Tools -->
+                    <section class="tab-pane" id="tools">
+                        <div class="head">
+                            <div>
+                                <h2 style="margin:0">Developer Tools</h2>
+                                <div class="sub">Safe customer-facing diagnostics and repository utilities.</div>
+                            </div>
+                        </div>
+                        <div class="tool-grid">
+                            <div class="glass tool-card">
+                                <h3>Git Clone Command</h3>
+                                <p>Clone the custom repository connected to this instance.</p>
+                                <button class="ghost" onclick="navigator.clipboard.writeText(document.getElementById('githubRepoUrl')?.value || 'git clone'); notify('Copied to clipboard!')">Copy Clone Command</button>
+                            </div>
+                            <div class="glass tool-card">
+                                <h3>Download Database</h3>
+                                <p>Download a database dump from this Live instance.</p>
+                                <a t-attf-href="/my/instance/{{instance.id}}/download-backup" class="ghost" style="display:inline-block;text-decoration:none">Download Backup</a>
+                            </div>
+                            <div class="glass tool-card">
+                                <h3>Live Logs</h3>
+                                <p>Inspect live container output and execution traces.</p>
+                                <button class="ghost" data-tab-jump="logs">View Logs</button>
+                            </div>
+                            <div class="glass tool-card">
+                                <h3>Custom Domains</h3>
+                                <p>Manage CNAME routing and HTTPS Let's Encrypt certificates.</p>
+                                <button class="ghost" data-tab-jump="domains">Manage Domains</button>
+                            </div>
+                            <div class="glass tool-card">
+                                <h3>Instance Settings</h3>
+                                <p>Configure workers, default modules and addons path.</p>
+                                <button class="ghost" data-tab-jump="configuration">Settings</button>
+                            </div>
+                            <div class="glass tool-card">
+                                <h3>Restart Services</h3>
+                                <p>Restart Odoo HTTP worker containers gracefully.</p>
+                                <button class="ghost" data-confirm="restart">Restart</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 12: Domains -->
+                    <section class="tab-pane" id="domains">
+                        <div class="wide-grid">
+                            <div class="glass form">
+                                <h2>Domains &amp; SSL</h2>
+                                <p>Manage public addresses, DNS verification and HTTPS certificates.</p>
+                                <div class="domain-form">
+                                    <input id="domainInput" placeholder="erp.mycompany.com"/>
+                                    <button class="primary" data-action="add-domain">Add Domain</button>
+                                </div>
+                                <div id="domainList">
+                                    <div class="option">
+                                        <div>
+                                            <strong t-esc="instance.url or (instance.name + '.' + instance.based_domain_id.name)"/>
+                                            <small>Primary platform domain</small>
+                                        </div>
+                                        <span class="status">SSL Active</span>
+                                    </div>
+                                    <t t-foreach="instance.domain_name_ids" t-as="dom">
+                                        <div class="option">
+                                            <div>
+                                                <strong t-esc="dom.name"/>
+                                                <small>Custom domain &amp;middot; <t t-esc="'DNS Verified' if dom.state == 'deploy' else 'Pending Verification'"/></small>
+                                            </div>
+                                            <div class="actions">
+                                                <span t-attf-class="status {{ 'warning' if dom.state != 'deploy' else '' }}">
+                                                    <t t-esc="'SSL Active' if dom.state == 'deploy' else 'Pending'"/>
+                                                </span>
+                                                <button class="ghost" data-action="remove-domain" t-att-data-domain-id="dom.id">Remove</button>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                            <div class="sidebar-stack">
+                                <div class="glass side-panel">
+                                    <h3>DNS Information</h3>
+                                    <div class="health-row"><span>Record type</span><strong>CNAME</strong></div>
+                                    <div class="health-row"><span>Target CNAME</span><strong t-esc="instance.based_domain_id.name"/></div>
+                                    <div class="health-row"><span>Managing IP</span><strong t-esc="managing_ip or '127.0.0.1'"/></div>
+                                    <div class="health-row"><span>HTTPS</span><strong class="ok">Enforced</strong></div>
+                                </div>
+                                <div class="glass side-panel">
+                                    <h3>Certificate Controls</h3>
+                                    <div class="health-row"><span>Provider</span><strong>Let's Encrypt</strong></div>
+                                    <div class="health-row"><span>Auto renewal</span><strong class="ok">Enabled</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 13: Access -->
+                    <section class="tab-pane" id="access">
+                        <div class="wide-grid">
+                            <div class="glass form">
+                                <h2>Team Access</h2>
+                                <p>Control who can manage this instance and its environments.</p>
+                                <div class="option">
+                                    <div>
+                                        <strong t-esc="instance.partner_id.name"/>
+                                        <small><t t-esc="instance.partner_id.email or 'owner@example.com'"/> &amp;middot; Account Owner</small>
+                                    </div>
+                                    <button class="ghost" disabled="disabled">Owner</button>
+                                </div>
+                            </div>
+                            <div class="glass side-panel">
+                                <h3>Developer Access</h3>
+                                <div class="health-row"><span>Status</span><strong class="ok">Active</strong></div>
+                                <div class="health-row"><span>Git Connected</span><strong><t t-esc="'Yes' if instance.github_connected else 'No'"/></strong></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tab 14: Settings / Configuration -->
+                    <section class="tab-pane" id="configuration">
+                        <div class="glass form">
+                            <h2>Instance Settings</h2>
+                            <p>Configure branch builds, modules, tests and project behavior.</p>
+                            <div class="form-grid">
+                                <div class="field">
+                                    <label>INSTANCE SUBDOMAIN</label>
+                                    <input t-att-value="instance.name" readonly="readonly"/>
+                                </div>
+                                <div class="field">
+                                    <label>ODOO VERSION</label>
+                                    <input t-att-value="instance.odoo_version_id.name" readonly="readonly"/>
+                                </div>
+                                <div class="field">
+                                    <label>DEFAULT BRANCH</label>
+                                    <input t-att-value="instance.github_branch or 'main'"/>
+                                </div>
+                                <div class="field">
+                                    <label>WORKERS</label>
+                                    <select>
+                                        <option>2 workers (Standard)</option>
+                                        <option>3 workers</option>
+                                        <option>4 workers</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="option">
+                                <div>
+                                    <strong>Automatic deployments</strong>
+                                    <small>Build and pull code when commits are pushed.</small>
+                                </div>
+                                <button class="toggle-button on"></button>
+                            </div>
+                            <button class="primary" data-action="save">Save Instance Settings</button>
+                        </div>
+                    </section>
+                </main>
+
+                <!-- Action Confirm Modal -->
+                <div class="modal" id="confirmModal">
+                    <div class="glass modal-card">
+                        <h2 id="confirmTitle">Confirm Action</h2>
+                        <p id="confirmText">This action can temporarily affect your instance.</p>
+                        <div class="modal-actions">
+                            <button class="ghost" id="cancelAction">Cancel</button>
+                            <button class="primary" id="confirmAction">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GitHub Connection Modal -->
+                <div class="modal" id="githubModal">
+                    <div class="glass modal-card github-modal-card">
+                        <h2>Connect GitHub Repository</h2>
+                        <p>Link your GitHub repository to pull custom addons directly into this Odoo instance.</p>
+                        <div class="field" style="margin-top:14px">
+                            <label>REPOSITORY URL</label>
+                            <input id="githubRepoUrl" t-att-value="instance.github_repo_url or ''" placeholder="https://github.com/my-org/my-odoo-addons"/>
+                        </div>
+                        <div class="field">
+                            <label>BRANCH</label>
+                            <input id="githubBranch" t-att-value="instance.github_branch or 'main'" placeholder="main"/>
+                        </div>
+                        <div class="field">
+                            <label>PERSONAL ACCESS TOKEN (FOR PRIVATE REPOSITORIES)</label>
+                            <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx (optional for public)"/>
+                            <small class="sub" style="display:block;margin-top:4px">Token needs 'repo' or 'contents:read' permission.</small>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="ghost" id="cancelGithub">Cancel</button>
+                            <button class="primary" id="confirmGithub">Connect &amp;amp; Clone</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="toast" id="toast"></div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Settings Page: /my/saas/settings -->
+    <template id="portal_settings_page" name="Portal Settings Page">
+        <t t-call="portal.frontend_layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="title">Settings — myodoo.nc</t>
+
+            <div class="myodoo-portal-root">
+                <t t-call="s_odoo_saas_master.myodoo_topbar"/>
+
+                <main class="page">
+                    <div class="head">
+                        <div>
+                            <span class="eyebrow">Workspace Preferences</span>
+                            <h1>Settings</h1>
+                            <div class="sub">Manage account, hosting, integrations, billing and security.</div>
+                        </div>
+                        <div>
+                            <button class="primary" id="saveSettings">Save Changes</button>
+                            <span class="save-status" id="saveStatus"></span>
+                        </div>
+                    </div>
+
+                    <section class="settings">
+                        <aside class="glass side" id="settingsNav">
+                            <button class="active" data-setting="general">General</button>
+                            <button data-setting="hosting">Hosting Defaults</button>
+                            <button data-setting="github">GitHub Integration</button>
+                            <button data-setting="notifications">Notifications</button>
+                            <button data-setting="security">Security</button>
+                            <button data-setting="billing">Billing Details</button>
+                            <button data-setting="team">Team Members</button>
+                        </aside>
+
+                        <div class="glass form">
+                            <section class="settings-pane active" id="setting-general">
+                                <h2>General Settings</h2>
+                                <p>Basic information used across your myodoo.nc workspace.</p>
+                                <div class="form-grid">
+                                    <div class="field">
+                                        <label>WORKSPACE NAME</label>
+                                        <input data-save="workspaceName" t-att-value="partner.name"/>
+                                    </div>
+                                    <div class="field">
+                                        <label>ACCOUNT EMAIL</label>
+                                        <input type="email" data-save="accountEmail" t-att-value="partner.email"/>
+                                    </div>
+                                    <div class="field">
+                                        <label>COMPANY NAME</label>
+                                        <input data-save="companyName" t-att-value="partner.company_name or partner.name"/>
+                                    </div>
+                                    <div class="field">
+                                        <label>PHONE</label>
+                                        <input data-save="phone" t-att-value="partner.phone or '+687 00 00 00'"/>
+                                    </div>
+                                    <div class="field">
+                                        <label>DEFAULT REGION</label>
+                                        <select data-save="region">
+                                            <option>New Caledonia</option>
+                                            <option>Australia</option>
+                                            <option>Singapore</option>
+                                        </select>
+                                    </div>
+                                    <div class="field">
+                                        <label>TIMEZONE</label>
+                                        <select data-save="timezone">
+                                            <option>Pacific/Noumea (UTC+11)</option>
+                                            <option>Asia/Karachi (UTC+5)</option>
+                                            <option>UTC (UTC+0)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="settings-pane" id="setting-hosting">
+                                <h2>Hosting Defaults</h2>
+                                <p>Defaults applied when you create a new instance.</p>
+                                <div class="form-grid">
+                                    <div class="field">
+                                        <label>DEFAULT ODOO VERSION</label>
+                                        <select data-save="odooVersion">
+                                            <option>Odoo 19</option>
+                                            <option>Odoo 18</option>
+                                            <option>Odoo 17</option>
+                                        </select>
+                                    </div>
+                                    <div class="field">
+                                        <label>DEFAULT WORKERS</label>
+                                        <select data-save="workers">
+                                            <option>2 workers</option>
+                                            <option>3 workers</option>
+                                            <option>4 workers</option>
+                                        </select>
+                                    </div>
+                                    <div class="field">
+                                        <label>DEFAULT STORAGE</label>
+                                        <select data-save="storage">
+                                            <option>20 GB</option>
+                                            <option>30 GB</option>
+                                            <option>50 GB</option>
+                                        </select>
+                                    </div>
+                                    <div class="field">
+                                        <label>BACKUP RETENTION</label>
+                                        <select data-save="retention">
+                                            <option>Standard retention</option>
+                                            <option>Extended retention</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>Automatic daily backups</strong>
+                                        <small>Create a database and filestore recovery point every day.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="dailyBackups"></button>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>Create preview environment</strong>
+                                        <small>Include a safe testing environment with new instances.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="previewEnvironment"></button>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>Automatic deployments</strong>
+                                        <small>Deploy successful builds from the default branch.</small>
+                                    </div>
+                                    <button class="toggle-button" data-toggle="autoDeploy"></button>
+                                </div>
+                            </section>
+
+                            <section class="settings-pane" id="setting-github">
+                                <h2>GitHub Integration</h2>
+                                <p>Connect repositories to enable code-based deployments and builds.</p>
+                                <div class="integration-card">
+                                    <div class="integration-icon">GH</div>
+                                    <div>
+                                        <h3>GitHub Account</h3>
+                                        <p id="githubState">No GitHub account connected.</p>
+                                    </div>
+                                    <div class="actions">
+                                        <button class="primary dark" id="connectGithub">Connect GitHub</button>
+                                        <button class="ghost hidden" id="disconnectGithub">Disconnect</button>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label>DEFAULT ORGANIZATION</label>
+                                    <input data-save="githubOrg" placeholder="organization-name"/>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>Build on push</strong>
+                                        <small>Create a build whenever code is pushed to a tracked branch.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="buildOnPush"></button>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>GitHub commit statuses</strong>
+                                        <small>Report build results back to GitHub commits.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="commitStatus"></button>
+                                </div>
+                            </section>
+
+                            <section class="settings-pane" id="setting-notifications">
+                                <h2>Notifications</h2>
+                                <p>Choose when myodoo.nc should contact your team.</p>
+                                <div class="option">
+                                    <div>
+                                        <strong>Deployment completed</strong>
+                                        <small>Notify when a production deployment succeeds.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="deploymentNotice"></button>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>Build failed</strong>
+                                        <small>Notify immediately when a build or test fails.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="buildFailed"></button>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>Backup failed</strong>
+                                        <small>Notify if an automatic or manual backup cannot complete.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="backupFailed"></button>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>Storage warning</strong>
+                                        <small>Notify when storage usage exceeds 80%.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="storageWarning"></button>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>Renewal reminder</strong>
+                                        <small>Send reminders 30, 14 and 3 days before expiry.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="renewalNotice"></button>
+                                </div>
+                                <div class="field">
+                                    <label>NOTIFICATION EMAIL</label>
+                                    <input type="email" data-save="notificationEmail" t-att-value="partner.email or 'admin@example.com'"/>
+                                </div>
+                            </section>
+
+                            <section class="settings-pane" id="setting-security">
+                                <h2>Security</h2>
+                                <p>Protect your customer portal and instance access.</p>
+                                <div class="option">
+                                    <div>
+                                        <strong>Two-factor authentication</strong>
+                                        <small>Require an additional verification code during sign-in.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="twoFactor"></button>
+                                </div>
+                                <div class="option">
+                                    <div>
+                                        <strong>Login alerts</strong>
+                                        <small>Email the account owner when a new device signs in.</small>
+                                    </div>
+                                    <button class="toggle-button on" data-toggle="loginAlerts"></button>
+                                </div>
+                                <div class="form-grid">
+                                    <div class="field">
+                                        <label>NEW PASSWORD</label>
+                                        <input type="password" id="newPassword" placeholder="Minimum 8 characters"/>
+                                    </div>
+                                    <div class="field">
+                                        <label>CONFIRM PASSWORD</label>
+                                        <input type="password" id="confirmPassword" placeholder="Repeat new password"/>
+                                    </div>
+                                </div>
+                                <button class="ghost" id="changePassword">Change Password</button>
+                                <div class="danger-zone">
+                                    <h3>Sign out all devices</h3>
+                                    <p>End every active customer portal session except this one.</p>
+                                    <button class="ghost" id="signOutDevices">Sign Out Other Devices</button>
+                                </div>
+                            </section>
+
+                            <section class="settings-pane" id="setting-billing">
+                                <h2>Billing Details</h2>
+                                <p>Manage your subscription and invoice information.</p>
+                                <div class="integration-card">
+                                    <div class="integration-icon">G</div>
+                                    <div>
+                                        <h3>Growth Plan &amp;middot; Monthly</h3>
+                                        <p>39,900 XPF / month &amp;middot; Renews 20 September 2026</p>
+                                    </div>
+                                    <div class="actions">
+                                        <a class="open-link" href="/saas/pricing">Change Plan</a>
+                                    </div>
+                                </div>
+                                <div class="form-grid">
+                                    <div class="field">
+                                        <label>BILLING NAME</label>
+                                        <input data-save="billingName" t-att-value="partner.company_name or partner.name"/>
+                                    </div>
+                                    <div class="field">
+                                        <label>TAX / BUSINESS NUMBER</label>
+                                        <input data-save="taxNumber" t-att-value="partner.vat or 'NC-123456'"/>
+                                    </div>
+                                    <div class="field">
+                                        <label>BILLING EMAIL</label>
+                                        <input type="email" data-save="billingEmail" t-att-value="partner.email or 'billing@example.com'"/>
+                                    </div>
+                                    <div class="field">
+                                        <label>ADDRESS</label>
+                                        <input data-save="billingAddress" t-att-value="partner.contact_address or 'Noumea, New Caledonia'"/>
+                                    </div>
+                                </div>
+                                <button class="ghost" id="downloadInvoice">Download Latest Invoice</button>
+                            </section>
+
+                            <section class="settings-pane" id="setting-team">
+                                <h2>Team Members</h2>
+                                <p>Invite people and control their customer portal permissions.</p>
+                                <div class="domain-form">
+                                    <input id="inviteEmail" type="email" placeholder="member@example.com"/>
+                                    <select id="inviteRole" style="border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.75);padding:0 10px">
+                                        <option>Developer</option>
+                                        <option>Administrator</option>
+                                        <option>Billing</option>
+                                        <option>Viewer</option>
+                                    </select>
+                                    <button class="primary" id="inviteMember">Invite</button>
+                                </div>
+                                <div id="memberList">
+                                    <div class="member-row">
+                                        <div>
+                                            <strong t-esc="partner.name"/>
+                                            <small t-esc="partner.email or 'admin@example.com'"/>
+                                        </div>
+                                        <span>Owner</span>
+                                        <span class="status">Active</span>
+                                        <button class="ghost" disabled="disabled">Owner</button>
+                                    </div>
+                                    <div class="member-row">
+                                        <div>
+                                            <strong>John Developer</strong>
+                                            <small>john@example.com</small>
+                                        </div>
+                                        <span>Developer</span>
+                                        <span class="status">Active</span>
+                                        <button class="ghost" data-remove-member="data-remove-member">Remove</button>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+                </main>
+                <div class="toast" id="toast"></div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Pricing Page: /saas/pricing -->
+    <template id="portal_pricing_page" name="Portal Pricing Page">
+        <t t-call="portal.frontend_layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="title">Pricing — myodoo.nc</t>
+
+            <div class="myodoo-portal-root">
+                <t t-call="s_odoo_saas_master.myodoo_topbar"/>
+
+                <main class="page">
+                    <div class="head" style="justify-content:center;text-align:center">
+                        <div>
+                            <span class="eyebrow">Simple Pricing</span>
+                            <h1>Choose your hosting plan</h1>
+                            <div class="sub">Daily backups, local support and secure Odoo hosting included.</div>
+                        </div>
+                    </div>
+
+                    <div class="billing-toggle">
+                        <button class="active" data-billing="monthly">Monthly</button>
+                        <button data-billing="annual">Annual &amp;middot; Save 15%</button>
+                    </div>
+
+                    <section class="plans">
+                        <div class="glass plan">
+                            <h2>Essential</h2>
+                            <p>For small teams getting started.</p>
+                            <div class="price">
+                                <span data-monthly="14,900" data-annual="151,980">14,900</span>
+                                <small data-period="XPF / month">XPF / month</small>
+                            </div>
+                            <div class="annual-note"></div>
+                            <ul>
+                                <li>Up to 5 users</li>
+                                <li>5 GB storage</li>
+                                <li>1 worker</li>
+                                <li>Daily backup</li>
+                                <li>Email support</li>
+                            </ul>
+                            <a href="/pricing" class="ghost" style="display:block;text-align:center;text-decoration:none">Choose Essential</a>
+                        </div>
+
+                        <div class="glass plan featured">
+                            <span class="popular-badge">Most Popular</span>
+                            <h2>Growth</h2>
+                            <p>For growing businesses and busy teams.</p>
+                            <div class="price">
+                                <span data-monthly="39,900" data-annual="406,980">39,900</span>
+                                <small data-period="XPF / month">XPF / month</small>
+                            </div>
+                            <div class="annual-note"></div>
+                            <ul>
+                                <li>Up to 20 users</li>
+                                <li>20 GB storage</li>
+                                <li>2 workers</li>
+                                <li>Twice-daily backups</li>
+                                <li>Preview environment</li>
+                                <li>Priority support</li>
+                            </ul>
+                            <a href="/pricing" class="primary" style="display:block;text-align:center;text-decoration:none">Choose Growth</a>
+                        </div>
+
+                        <div class="glass plan">
+                            <h2>Enterprise</h2>
+                            <p>For advanced multi-instance operations.</p>
+                            <div class="price">Custom <small>tailored quote</small></div>
+                            <div class="annual-note"></div>
+                            <ul>
+                                <li>Unlimited users</li>
+                                <li>Custom storage</li>
+                                <li>Custom workers</li>
+                                <li>Multiple instances</li>
+                                <li>Dedicated SLA</li>
+                            </ul>
+                            <a href="/pricing" class="ghost" style="display:block;text-align:center;text-decoration:none">Contact Us</a>
+                        </div>
+                    </section>
+                    <div class="pricing-note">Annual plans are billed once per year and include a 15% discount.</div>
+                </main>
+            </div>
+        </t>
+    </template>
+
+</odoo>
