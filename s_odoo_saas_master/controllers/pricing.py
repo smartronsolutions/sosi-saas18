@@ -76,13 +76,15 @@ class Pricing(http.Controller):
             })
 
         values = {
+            'page_name': 'saas_pricing',
+            'partner': partner,
             'domains': domains,
             'pricelist': pricelist,
             'pricelists': pricelists,
             'data': data,
             'currency_symbol': pricelist.currency_id.symbol or 'XPF',
         }
-        return request.render("s_odoo_saas_master.pricing", values)
+        return request.render("s_odoo_saas_master.portal_pricing_page", values)
 
     @http.route(['/pricing/get-saas-pricelist'], type='json', auth='public')
     def get_saas_pricelist(self, pricelist_id):

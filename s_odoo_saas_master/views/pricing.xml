@@ -2,53 +2,7 @@
 <odoo>
 
   <template id="pricing" name="Pricing">
-    <t t-call="website.layout">
-      <t t-set="additional_title">Pricing</t>
-      <div id="wrap" class="js_sale">
-        <section class="s_banner o_gradient js_top_banner text-center bg-primary">
-          <h1 class="display-2 text-white py-5 mb-5">Pricing</h1>
-        </section>
-        <section class="openerp_enterprise_pricing position-relative">
-          <form class="openerp_enterprise_pricing_form container pt-4" method="post" action="/pricing/checkout">
-            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-            <input type="checkbox" name="is_trial" class="openerp_enterprise_pricing_app_trial d-none"/>
-            <input type="checkbox" name="buy_now_from_pricing" class="d-none" checked="1"/>
-            <div class="d-none openerp_enterprise_pricing_pricelist" t-attf-data-pricelist="{{ pricelist.id }}"></div>
-            <div class="row">
-              <div class="col-12 col-md-8 col-lg-8">
-                <div class="openerp_enterprise_pricing_step mb-5">
-                  <div class="openerp_enterprise_pricing_step_head">
-                    <h3 class="mt16 mb8">Choose your
-                      <b>Domain</b>
-                    </h3>
-                  </div>
-                  <t t-call="s_odoo_saas_master.domain_picking"/>
-                </div>
-                <div class="openerp_enterprise_pricing_step mb-5" id="choose_your_user">
-                  <div class="openerp_enterprise_pricing_step_head">
-                    <h3 class="mt16 mb8">Choose the number of
-                      <b>Users</b>
-                    </h3>
-                  </div>
-                  <t t-call="s_odoo_saas_master.users_pricing"/>
-                </div>
-                <div class="openerp_enterprise_pricing_step" id="choose_your_app">
-                  <div class="openerp_enterprise_pricing_step_head">
-                    <h3 class="mt16 mb16">Choose your
-                      <b>Apps</b>
-                    </h3>
-                  </div>
-                  <t t-call="s_odoo_saas_master.apps_pricing"/>
-                </div>
-              </div>
-              <div class="col-12 col-md-4 col-lg-4 mt16" id="pricing_board">
-              	<t t-call="s_odoo_saas_master.pricing_board"/>
-              </div>
-            </div>
-          </form>
-        </section>
-      </div>
-    </t>
+    <t t-call="s_odoo_saas_master.portal_pricing_page"/>
   </template>
 
   <template id="domain_picking" name="Domain Picking">

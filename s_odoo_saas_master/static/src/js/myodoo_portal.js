@@ -33,6 +33,7 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
         this._initSearch();
         this._initSettings();
         this._initMails();
+        this._initPricing();
 
         if (location.hash) {
             const targetTab = document.querySelector('[data-tab="' + location.hash.slice(1) + '"]');
@@ -502,6 +503,115 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
                 notify("Email preview loaded.");
             });
         });
+    },
+
+    _initPricing() {
+        // Monthly / Annual toggle
+        const billingBtns = document.querySelectorAll("[data-billing]");
+        if (billingBtns.length) {
+            billingBtns.forEach(button => {
+                button.addEventListener("click", () => {
+                    const annual = button.dataset.billing === "annual";
+                    billingBtns.forEach(item => item.classList.toggle("active", item === button));
+
+                    document.querySelectorAll("[data-monthly]").forEach(price => {
+                        price.textContent = annual ? price.dataset.annual : price.dataset.monthly;
+                    });
+                    document.querySelectorAll("[data-period]").forEach(period => {
+                        period.textContent = annual ? "XPF / year" : "XPF / month";
+                    });
+                    document.querySelectorAll(".annual-note").forEach(note => {
+                        note.textContent = annual ? "15% annual discount applied" : "";
+                    });
+
+                    const orderPriceBy = document.getElementById("orderPriceBy");
+                    if (orderPriceBy) orderPriceBy.value = annual ? "yearly" : "monthly";
+
+                    const activePlanBtn = document.querySelector("[data-choose-plan].selected");
+                    if (activePlanBtn) {
+                        const price = annual ? activePlanBtn.dataset.annualPrice : activePlanBtn.dataset.monthlyPrice;
+                        const planName = activePlanBtn.dataset.choosePlan;
+                        const summary = document.getElementById("orderPlanSummary");
+                        const note = document.getElementById("orderCycleNote");
+                        if (summary) summary.textContent = planName + " Plan · " + price + (annual ? " XPF / year" : " XPF / month");
+                        if (note) note.textContent = annual ? "Annual subscription · 15% discount included" : "Monthly subscription · Cancel or upgrade anytime";
+                    }
+                });
+            });
+        }
+
+        // Plan Choose button -> Open Modal
+        const planModal = document.getElementById("orderPlanModal");
+        document.querySelectorAll("[data-choose-plan]").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const planName = btn.dataset.choosePlan;
+                document.querySelectorAll("[data-choose-plan]").forEach(b => b.classList.remove("selected"));
+                btn.classList.add("selected");
+
+                const annual = document.querySelector('[data-billing="annual"]')?.classList.contains("active");
+                const price = annual ? btn.dataset.annualPrice : btn.dataset.monthlyPrice;
+
+                const modalTitle = document.getElementById("planModalTitle");
+                const orderPlanName = document.getElementById("orderPlanName");
+                const orderPlanSummary = document.getElementById("orderPlanSummary");
+                const orderCycleNote = document.getElementById("orderCycleNote");
+
+                if (modalTitle) modalTitle.textContent = "Deploy " + planName + " Plan";
+                if (orderPlanName) orderPlanName.value = planName;
+                if (orderPlanSummary) orderPlanSummary.textContent = planName + " Plan · " + price + (annual ? " XPF / year" : " XPF / month");
+                if (orderCycleNote) orderCycleNote.textContent = annual ? "Annual subscription · 15% discount included" : "Monthly subscription · Cancel or upgrade anytime";
+
+                if (planModal) planModal.classList.add("show");
+            });
+        });
+
+        // Cancel modal
+        document.getElementById("cancelPlanModal")?.addEventListener("click", () => {
+            if (planModal) planModal.classList.remove("show");
+        });
+
+        // Subdomain formatting helper
+        const subInput = document.getElementById("planSubDomain");
+        if (subInput) {
+            subInput.addEventListener("input", () => {
+                subInput.value = subInput.value.toLowerCase().replace(/[^a-z0-9\-]/g, "");
+            });
+        }
+
+        // Start 15 Days Free Trial
+        const trialBtn = document.getElementById("startTrialBtn");
+        if (trialBtn) {
+            trialBtn.addEventListener("click", async () => {
+                const subDomain = document.getElementById("planSubDomain")?.value?.trim();
+                const baseDomainId = document.getElementById("planBaseDomain")?.value;
+                if (!subDomain) {
+                    notify("Please enter a subdomain first.");
+                    return;
+                }
+                notify("Creating trial instance...");
+                if (planModal) planModal.classList.remove("show");
+
+                try {
+                    const res = await this.rpc("/saas/instance/create-trial", {
+                        instance_vals: {
+                            base_domain_id: parseInt(baseDomainId) || 1,
+                            sub_domain: subDomain,
+                            default_app_ids: []
+                        }
+                    });
+                    if (res && res.id) {
+                        notify("Trial instance created successfully! Redirecting...");
+                        setTimeout(() => {
+                            window.location.href = "/my/saas/odoo-instance/" + res.id;
+                        }, 1200);
+                    } else {
+                        notify("Failed to create trial: " + (res?.error || "Error"));
+                    }
+                } catch (e) {
+                    notify("Trial error: " + (e.message || "Please sign in first"));
+                }
+            });
+        }
     }
 });
 

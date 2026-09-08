@@ -1332,7 +1332,7 @@
         </t>
     </template>
 
-    <!-- Pricing Page: /saas/pricing -->
+    <!-- Pricing Page: /saas/pricing and /pricing -->
     <template id="portal_pricing_page" name="Portal Pricing Page">
         <t t-call="portal.frontend_layout">
             <t t-set="no_header" t-value="True"/>
@@ -1372,7 +1372,7 @@
                                 <li>Daily backup</li>
                                 <li>Email support</li>
                             </ul>
-                            <a href="/pricing" class="ghost" style="display:block;text-align:center;text-decoration:none">Choose Essential</a>
+                            <button type="button" class="ghost" data-choose-plan="Essential" data-monthly-price="14,900" data-annual-price="151,980" style="width:100%">Choose Essential</button>
                         </div>
 
                         <div class="glass plan featured">
@@ -1392,7 +1392,7 @@
                                 <li>Preview environment</li>
                                 <li>Priority support</li>
                             </ul>
-                            <a href="/pricing" class="primary" style="display:block;text-align:center;text-decoration:none">Choose Growth</a>
+                            <button type="button" class="primary" data-choose-plan="Growth" data-monthly-price="39,900" data-annual-price="406,980" style="width:100%">Choose Growth</button>
                         </div>
 
                         <div class="glass plan">
@@ -1407,11 +1407,63 @@
                                 <li>Multiple instances</li>
                                 <li>Dedicated SLA</li>
                             </ul>
-                            <a href="/pricing" class="ghost" style="display:block;text-align:center;text-decoration:none">Contact Us</a>
+                            <a href="/contactus" class="ghost" style="display:block;text-align:center;text-decoration:none">Contact Us</a>
                         </div>
                     </section>
                     <div class="pricing-note">Annual plans are billed once per year and include a 15% discount.</div>
                 </main>
+
+                <!-- Order / Free Trial Modal -->
+                <div class="modal" id="orderPlanModal">
+                    <div class="glass modal-card" style="width:100%;max-width:520px;padding:24px">
+                        <h2 id="planModalTitle">Deploy Growth Plan</h2>
+                        <p id="planModalSubtitle">Configure your domain and start your Odoo instance.</p>
+
+                        <form id="planOrderForm" method="post" action="/pricing/checkout">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="buy_now_from_pricing" value="on"/>
+                            <input type="hidden" name="price_by" id="orderPriceBy" value="monthly"/>
+                            <input type="hidden" name="num_users" value="1"/>
+                            <input type="hidden" name="plan" id="orderPlanName" value="Growth"/>
+
+                            <div class="field" style="margin-bottom:14px">
+                                <label>CHOOSE YOUR SUBDOMAIN</label>
+                                <div style="display:flex;align-items:center;gap:6px">
+                                    <input type="text" name="sub_domain" id="planSubDomain" placeholder="mycompany" required="required" style="flex:1;padding:11px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.75);color:var(--ink)"/>
+                                    <span style="font-weight:700;color:var(--muted)">.</span>
+                                    <select name="domain" id="planBaseDomain" style="flex:1;padding:11px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.75);color:var(--ink)">
+                                        <t t-foreach="domains" t-as="dom">
+                                            <option t-att-value="dom.id"><t t-esc="dom.name"/></option>
+                                        </t>
+                                        <t t-if="not domains">
+                                            <option value="1">odoo.nc</option>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div id="subdomainLiveCheck" style="margin-top:6px;font-size:10px;font-weight:700;color:var(--muted)">Instance will be hosted at this URL.</div>
+                            </div>
+
+                            <div class="field" style="margin-bottom:18px">
+                                <label>PLAN &amp;amp; BILLING</label>
+                                <div class="option" style="padding:10px 0;border:0">
+                                    <div>
+                                        <strong id="orderPlanSummary">Growth Plan · 39,900 XPF / month</strong>
+                                        <small id="orderCycleNote">Monthly plan · Cancel or upgrade anytime</small>
+                                    </div>
+                                    <span class="status">Instant Setup</span>
+                                </div>
+                            </div>
+
+                            <div class="modal-actions" style="margin-top:16px">
+                                <button type="button" class="ghost" id="cancelPlanModal">Cancel</button>
+                                <button type="button" class="ghost" id="startTrialBtn" style="color:var(--deep);font-weight:800">Start 15-Day Free Trial</button>
+                                <button type="submit" class="primary" id="submitOrderBtn">Order &amp;amp; Deploy</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="toast" id="toast"></div>
             </div>
         </t>
     </template>
