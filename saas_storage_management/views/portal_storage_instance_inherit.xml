@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Inherit portal instance page to add storage information and upgrade links -->
+    <template id="portal_instance_page_storage_inherit" inherit_id="s_odoo_saas_master.portal_instance_page">
+        <!-- 1. Add Storage button into workspace-head actions -->
+        <xpath expr="//section[hasclass('workspace-head')]//div[hasclass('actions')]" position="inside">
+            <a t-attf-href="/my/storage/{{ instance.id }}" class="ghost" style="text-decoration:none" title="Storage Details &amp; Upgrade">
+                <i class="fa fa-database"/> Storage (<t t-esc="round(instance.storage_used_gb or 0.0, 1)"/> GB)
+            </a>
+        </xpath>
+
+        <!-- 2. Dynamically replace Storage card in Overview detail-grid with live values -->
+        <xpath expr="//div[@id='instanceStorageCard']" position="replace">
+            <div class="glass detail-card" id="instanceStorageCard">
+                <small>Storage</small>
+                <strong>
+                    <t t-esc="round(instance.storage_used_gb or 0.0, 1)"/> / 
+                    <t t-if="instance.storage_is_unlimited">Unlimited</t>
+                    <t t-else=""><t t-esc="instance.storage_limit_gb"/> GB</t>
+                </strong>
+                <div class="mini-bar" style="width:100%">
+                    <i t-attf-style="width:{{ min(instance.storage_percentage or 0.0, 100) }}%"></i>
+                </div>
+                <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+                    <span t-attf-class="status {{ 'ok' if instance.storage_status in ('ok', 'unlimited') else 'warning' }}">
+                        <t t-esc="(instance.storage_status or 'ok').upper()"/>
+                    </span>
+                    <a t-attf-href="/my/storage/{{ instance.id }}" style="font-size:10px;font-weight:700;color:var(--deep);text-decoration:none">
+                        Manage &amp;rarr;
+                    </a>
+                </div>
+            </div>
+        </xpath>
+
+        <!-- 3. In Overview control-grid, add Storage Upgrade action -->
+        <xpath expr="//div[hasclass('control-grid')]" position="inside">
+            <a t-attf-href="/my/storage/{{ instance.id }}" class="control-btn" style="text-decoration:none">
+                <b>Storage Upgrade</b>
+                <small>View 7-day usage history and request limit increase.</small>
+            </a>
+        </xpath>
+
+        <!-- 4. In Monitor tab, show actual live storage stats on Storage Growth card -->
+        <xpath expr="//div[@id='instanceStorageGrowthCard']//div[hasclass('sub')]" position="replace">
+            <div class="sub" style="margin-top:9px">
+                Used <b><t t-esc="round(instance.storage_used_gb or 0.0, 1)"/> GB</b> of <b><t t-esc="'Unlimited' if instance.storage_is_unlimited else str(instance.storage_limit_gb) + ' GB'"/></b> (<t t-esc="round(instance.storage_percentage or 0.0, 1)"/>%)
+            </div>
+        </xpath>
+    </template>
+
+    <!-- Topbar inherit: Add Storage link to portal navigation -->
+    <template id="myodoo_topbar_storage_inherit" inherit_id="s_odoo_saas_master.myodoo_topbar">
+        <xpath expr="//nav[hasclass('nav-links')]" position="inside">
+            <a href="/my/storage">Storage</a>
+        </xpath>
+    </template>
+</odoo>

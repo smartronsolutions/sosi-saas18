@@ -432,7 +432,7 @@
                                 <strong t-esc="'Online' if instance.operation_state == 'run' else 'Stopped'"/>
                                 <span class="healthy">All services healthy</span>
                             </div>
-                            <div class="glass detail-card">
+                            <div class="glass detail-card" id="instanceStorageCard">
                                 <small>Storage</small>
                                 <strong>5.4 / 20 GB</strong>
                                 <div class="mini-bar" style="width:100%"><i style="width:27%"></i></div>
@@ -645,7 +645,7 @@
                                 </div>
                                 <div class="sub" style="margin-top:9px">Average 42% &amp;middot; Peak 72%</div>
                             </div>
-                            <div class="glass chart-card">
+                            <div class="glass chart-card" id="instanceStorageGrowthCard">
                                 <h3>Storage Growth</h3>
                                 <div class="bars">
                                     <i style="height:55%"></i><i style="height:57%"></i><i style="height:59%"></i><i style="height:62%"></i><i style="height:64%"></i>
