@@ -12,9 +12,47 @@ class SaasOdooInstance(models.Model):
     # Storage fields
     storage_limit_gb = fields.Float(
         string='Storage Limit (GB)',
-        default=0.5,
-        help='Maximum storage allowed for this instance in GB. Leave empty or 0 for unlimited. Default: 500MB (0.5GB)'
+        default=5.0,
+        help='Maximum storage allowed for this instance in GB. Default: 5 GB for Essential, 20 GB for Growth. Leave empty or 0 for unlimited.'
     )
+
+    @api.model
+    def _prepare_instance_val_to_create(self, data):
+        res = super()._prepare_instance_val_to_create(data)
+
+        # 1. Direct explicit storage passed in data
+        if data.get('storage_limit_gb'):
+            res['storage_limit_gb'] = float(data.get('storage_limit_gb'))
+            return res
+        if data.get('storage_gb'):
+            res['storage_limit_gb'] = float(data.get('storage_gb'))
+            return res
+
+        # 2. Extract plan and extra storage from order or data
+        plan = data.get('plan') or data.get('plan_name')
+        extra_storage_gb = float(data.get('extra_storage_gb') or 0.0)
+
+        sub_domain = data.get('sub_domain')
+        if sub_domain:
+            order = self.env['sale.order'].search([('subdomain', '=', sub_domain)], limit=1)
+            if order:
+                if hasattr(order, 'storage_limit_gb') and order.storage_limit_gb > 0:
+                    res['storage_limit_gb'] = float(order.storage_limit_gb)
+                    return res
+                for line in order.order_line:
+                    code = (line.product_id.default_code or '').lower()
+                    name = (line.product_id.name or '').lower()
+                    if not plan:
+                        if 'growth' in code or 'growth' in name:
+                            plan = 'Growth'
+                        elif 'essential' in code or 'essential' in name:
+                            plan = 'Essential'
+                    if code == 'saas_extra_storage' or 'extra storage' in name:
+                        extra_storage_gb += float(line.product_uom_qty or 0.0)
+
+        base_storage = 20.0 if (plan and 'growth' in str(plan).lower()) else 5.0
+        res['storage_limit_gb'] = base_storage + extra_storage_gb
+        return res
     
     # Stored (not recomputed on every read): filesystem scanning is expensive, so the
     # value only changes when the hourly cron (check_storage) explicitly writes it -

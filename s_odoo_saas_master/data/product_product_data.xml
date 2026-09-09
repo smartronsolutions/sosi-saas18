@@ -564,4 +564,13 @@
         <field name="is_published" eval="True"/>
     </record>
 
+    <record id="product_saas_extra_storage" model="product.product">
+        <field name="name">Extra Storage (per GB)</field>
+        <field name="default_code">saas_extra_storage</field>
+        <field name="can_be_user_app" eval="False"/>
+        <field name="type">service</field>
+        <field name="list_price">220.0</field>
+        <field name="is_published" eval="True"/>
+    </record>
+
 </odoo>

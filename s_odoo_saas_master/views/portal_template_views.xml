@@ -1370,13 +1370,14 @@
                             <div class="annual-note"></div>
                             <ul>
                                 <li>Up to 5 users</li>
-                                <li>5 GB storage</li>
+                                <li>5 GB storage <span style="font-size:11px;color:var(--deep);font-weight:600">(+ Pay-as-you-use)</span></li>
                                 <li>1 worker</li>
                                 <li>Daily backup</li>
                                 <li>Email support</li>
                             </ul>
                             <button type="button" class="ghost"
                                     data-choose-plan="Essential"
+                                    data-base-storage="5"
                                     t-att-data-product-id="essential_product.id if essential_product else ''"
                                     t-att-data-monthly-price="essential_monthly_price_formatted or '14,900'"
                                     t-att-data-annual-price="essential_annual_price_formatted or '151,980'"
@@ -1399,7 +1400,7 @@
                             <div class="annual-note"></div>
                             <ul>
                                 <li>Up to 20 users</li>
-                                <li>20 GB storage</li>
+                                <li>20 GB storage <span style="font-size:11px;color:var(--deep);font-weight:600">(+ Pay-as-you-use)</span></li>
                                 <li>2 workers</li>
                                 <li>Twice-daily backups</li>
                                 <li>Preview environment</li>
@@ -1407,6 +1408,7 @@
                             </ul>
                             <button type="button" class="primary"
                                     data-choose-plan="Growth"
+                                    data-base-storage="20"
                                     t-att-data-product-id="growth_product.id if growth_product else ''"
                                     t-att-data-monthly-price="growth_monthly_price_formatted or '39,900'"
                                     t-att-data-annual-price="growth_annual_price_formatted or '406,980'"
@@ -1441,6 +1443,12 @@
                      t-att-data-user-price-monthly-fmt="user_monthly_price_formatted or '100'"
                      t-att-data-user-price-yearly-fmt="user_annual_price_formatted or '1,020'"
                      t-att-data-user-price-annual-month-fmt="user_annual_per_month_formatted or '85'"
+                     t-att-data-storage-price-monthly="extra_storage_monthly_price or 220"
+                     t-att-data-storage-price-yearly="extra_storage_annual_price or 2244"
+                     t-att-data-storage-price-annual-month="extra_storage_annual_per_month or 187"
+                     t-att-data-storage-price-monthly-fmt="extra_storage_monthly_price_formatted or '220'"
+                     t-att-data-storage-price-yearly-fmt="extra_storage_annual_price_formatted or '2,244'"
+                     t-att-data-storage-price-annual-month-fmt="extra_storage_annual_per_month_formatted or '187'"
                      t-att-data-currency-symbol="currency_symbol or 'XPF'">
                     <div class="glass modal-card" style="width:100%;max-width:520px;padding:24px">
                         <h2 id="planModalTitle">Deploy Essential Plan</h2>
@@ -1478,6 +1486,18 @@
                                     <button type="button" class="ghost" id="btnPlusUser" style="width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;border-radius:8px;cursor:pointer">+</button>
                                     <span style="font-size:11px;color:var(--muted);margin-left:6px" id="userPriceDisplay">
                                         <t t-esc="user_monthly_price_formatted or '100'"/> <t t-esc="currency_symbol or 'XPF'"/> / user / month
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="field" style="margin-bottom:14px">
+                                <label>STORAGE (GB)</label>
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <button type="button" class="ghost" id="btnMinusStorage" style="width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;border-radius:8px;cursor:pointer">-</button>
+                                    <input type="number" name="storage_gb" id="planStorageGb" min="5" max="500" value="5" style="width:70px;text-align:center;padding:7px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.75);color:var(--ink);font-weight:800"/>
+                                    <button type="button" class="ghost" id="btnPlusStorage" style="width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;border-radius:8px;cursor:pointer">+</button>
+                                    <span style="font-size:11px;color:var(--muted);margin-left:6px" id="storagePriceDisplay">
+                                        5 GB included · + <t t-esc="extra_storage_monthly_price_formatted or '220'"/> <t t-esc="currency_symbol or 'XPF'"/> / extra GB / month
                                     </span>
                                 </div>
                             </div>

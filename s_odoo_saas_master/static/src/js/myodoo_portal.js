@@ -513,19 +513,57 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
         const userPriceMonthlyFmt = planModal?.dataset.userPriceMonthlyFmt || "100";
         const userPriceYearlyFmt = planModal?.dataset.userPriceYearlyFmt || "1,020";
         const userPriceAnnualMonthFmt = planModal?.dataset.userPriceAnnualMonthFmt || "85";
+
+        const storagePriceMonthly = parseFloat(planModal?.dataset.storagePriceMonthly || 220);
+        const storagePriceYearly = parseFloat(planModal?.dataset.storagePriceYearly || 2244);
+        const storagePriceAnnualMonth = parseFloat(planModal?.dataset.storagePriceAnnualMonth || 187);
+        const storagePriceMonthlyFmt = planModal?.dataset.storagePriceMonthlyFmt || "220";
+        const storagePriceYearlyFmt = planModal?.dataset.storagePriceYearlyFmt || "2,244";
+        const storagePriceAnnualMonthFmt = planModal?.dataset.storagePriceAnnualMonthFmt || "187";
+
         const currencySymbol = planModal?.dataset.currencySymbol || "XPF";
+
+        const formatMoney = (val) => {
+            if (val === null || val === undefined || isNaN(val)) return "0";
+            const num = parseFloat(val);
+            if (Number.isInteger(num)) {
+                return num.toLocaleString();
+            }
+            return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
 
         const updateModalPricing = () => {
             const activePlanBtn = document.querySelector("[data-choose-plan].selected") || document.querySelector('[data-choose-plan="Essential"]');
             const planName = activePlanBtn ? activePlanBtn.dataset.choosePlan : "Essential";
             const planProductId = activePlanBtn ? (activePlanBtn.dataset.productId || "") : "";
+            const baseStorage = parseInt(activePlanBtn?.dataset.baseStorage || (planName === "Growth" ? 20 : 5));
             const annual = document.querySelector('[data-billing="annual"]')?.classList.contains("active");
-            const basePrice = activePlanBtn ? (annual ? activePlanBtn.dataset.annualPrice : activePlanBtn.dataset.monthlyPrice) : (annual ? "151,980" : "14,900");
 
+            // Plan base price
+            const planMonthlyRaw = parseFloat(activePlanBtn?.dataset.monthlyRaw || (planName === "Growth" ? 39900 : 14900));
+            const planAnnualRaw = parseFloat(activePlanBtn?.dataset.annualRaw || (planName === "Growth" ? 406980 : 151980));
+            const planPrice = annual ? planAnnualRaw : planMonthlyRaw;
+
+            // Users count
             const countInput = document.getElementById("planUsersCount");
             let usersCount = countInput ? (parseInt(countInput.value) || 1) : 1;
             if (usersCount < 1) usersCount = 1;
 
+            // Storage GB
+            const storageInput = document.getElementById("planStorageGb");
+            if (storageInput) {
+                storageInput.min = baseStorage;
+                let currentStorage = parseInt(storageInput.value) || baseStorage;
+                if (currentStorage < baseStorage) {
+                    currentStorage = baseStorage;
+                    storageInput.value = baseStorage;
+                }
+            }
+            let storageGb = storageInput ? (parseInt(storageInput.value) || baseStorage) : baseStorage;
+            if (storageGb < baseStorage) storageGb = baseStorage;
+            const extraStorageGb = Math.max(0, storageGb - baseStorage);
+
+            // User pricing display
             const userPriceEl = document.getElementById("userPriceDisplay");
             if (userPriceEl) {
                 if (annual) {
@@ -534,6 +572,21 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
                     userPriceEl.textContent = userPriceMonthlyFmt + " " + currencySymbol + " / user / month";
                 }
             }
+
+            // Storage pricing display
+            const storagePriceEl = document.getElementById("storagePriceDisplay");
+            if (storagePriceEl) {
+                if (annual) {
+                    storagePriceEl.textContent = baseStorage + " GB included · + " + storagePriceAnnualMonthFmt + " " + currencySymbol + " / extra GB / mo (15% OFF)";
+                } else {
+                    storagePriceEl.textContent = baseStorage + " GB included · + " + storagePriceMonthlyFmt + " " + currencySymbol + " / extra GB / mo";
+                }
+            }
+
+            // Calculate exact total (Plan + Users + Extra Storage)
+            const userTotal = annual ? (usersCount * userPriceYearly) : (usersCount * userPriceMonthly);
+            const storageTotal = annual ? (extraStorageGb * storagePriceYearly) : (extraStorageGb * storagePriceMonthly);
+            const grandTotal = planPrice + userTotal + storageTotal;
 
             const modalTitle = document.getElementById("planModalTitle");
             const orderPlanName = document.getElementById("orderPlanName");
@@ -545,10 +598,14 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
             if (orderPlanName) orderPlanName.value = planName;
             if (orderPlanProductId) orderPlanProductId.value = planProductId;
             if (orderPlanSummary) {
-                orderPlanSummary.textContent = planName + " Plan · " + basePrice + " " + currencySymbol + " / " + (annual ? "year" : "month") + " (" + usersCount + " " + (usersCount === 1 ? "User" : "Users") + ")";
+                let storageNote = storageGb + " GB Storage";
+                if (extraStorageGb > 0) {
+                    storageNote += " (+" + extraStorageGb + " GB extra)";
+                }
+                orderPlanSummary.textContent = planName + " Plan · " + formatMoney(grandTotal) + " " + currencySymbol + " / " + (annual ? "year" : "month") + " (" + usersCount + " " + (usersCount === 1 ? "User" : "Users") + " · " + storageNote + ")";
             }
             if (orderCycleNote) {
-                orderCycleNote.textContent = annual ? "Annual subscription · 15% discount included" : "Monthly subscription · Cancel or upgrade anytime";
+                orderCycleNote.textContent = annual ? "Annual subscription · 15% discount included · Instant Setup" : "Monthly subscription · Cancel or upgrade anytime · Instant Setup";
             }
         };
 
@@ -583,6 +640,14 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
             btn.addEventListener("click", () => {
                 document.querySelectorAll("[data-choose-plan]").forEach(b => b.classList.remove("selected"));
                 btn.classList.add("selected");
+                
+                const baseStorage = parseInt(btn.dataset.baseStorage || (btn.dataset.choosePlan === "Growth" ? 20 : 5));
+                const storageInput = document.getElementById("planStorageGb");
+                if (storageInput) {
+                    storageInput.min = baseStorage;
+                    storageInput.value = baseStorage;
+                }
+                
                 updateModalPricing();
                 if (planModal) planModal.classList.add("show");
             });
@@ -626,6 +691,37 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
             updateModalPricing();
         });
 
+        // Storage increment / decrement buttons
+        document.getElementById("btnMinusStorage")?.addEventListener("click", () => {
+            const activePlanBtn = document.querySelector("[data-choose-plan].selected") || document.querySelector('[data-choose-plan="Essential"]');
+            const planName = activePlanBtn ? activePlanBtn.dataset.choosePlan : "Essential";
+            const baseStorage = parseInt(activePlanBtn?.dataset.baseStorage || (planName === "Growth" ? 20 : 5));
+            const storageInput = document.getElementById("planStorageGb");
+            if (storageInput) {
+                let val = parseInt(storageInput.value) || baseStorage;
+                if (val > baseStorage) {
+                    storageInput.value = val - 1;
+                    updateModalPricing();
+                }
+            }
+        });
+
+        document.getElementById("btnPlusStorage")?.addEventListener("click", () => {
+            const activePlanBtn = document.querySelector("[data-choose-plan].selected") || document.querySelector('[data-choose-plan="Essential"]');
+            const planName = activePlanBtn ? activePlanBtn.dataset.choosePlan : "Essential";
+            const baseStorage = parseInt(activePlanBtn?.dataset.baseStorage || (planName === "Growth" ? 20 : 5));
+            const storageInput = document.getElementById("planStorageGb");
+            if (storageInput) {
+                let val = parseInt(storageInput.value) || baseStorage;
+                storageInput.value = val + 1;
+                updateModalPricing();
+            }
+        });
+
+        document.getElementById("planStorageGb")?.addEventListener("input", () => {
+            updateModalPricing();
+        });
+
         // Start 15 Days Free Trial
         const trialBtn = document.getElementById("startTrialBtn");
         if (trialBtn) {
@@ -633,6 +729,11 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
                 const subDomain = document.getElementById("planSubDomain")?.value?.trim();
                 const baseDomainId = document.getElementById("planBaseDomain")?.value;
                 const usersCount = parseInt(document.getElementById("planUsersCount")?.value) || 1;
+                const activePlanBtn = document.querySelector("[data-choose-plan].selected") || document.querySelector('[data-choose-plan="Essential"]');
+                const planName = activePlanBtn ? activePlanBtn.dataset.choosePlan : "Essential";
+                const baseStorage = parseInt(activePlanBtn?.dataset.baseStorage || (planName === "Growth" ? 20 : 5));
+                const storageGb = parseInt(document.getElementById("planStorageGb")?.value) || baseStorage;
+
                 if (!subDomain) {
                     notify("Please enter a subdomain first.");
                     return;
@@ -645,7 +746,9 @@ publicWidget.registry.MyOdooPortal = publicWidget.Widget.extend({
                         instance_vals: {
                             base_domain_id: parseInt(baseDomainId) || 1,
                             sub_domain: subDomain,
+                            plan: planName,
                             users_count: usersCount,
+                            storage_gb: storageGb,
                             default_app_ids: []
                         }
                     });

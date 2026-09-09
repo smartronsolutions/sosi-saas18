@@ -58,6 +58,49 @@ class Pricing(http.Controller):
             prod = Product.search([('name', 'ilike', 'SaaS User'), ('active', '=', True)], limit=1)
         return prod
 
+    def _get_extra_storage_product(self):
+        Product = request.env['product.product'].sudo()
+        prod = Product.search([('default_code', '=ilike', 'saas_extra_storage'), ('active', '=', True)], limit=1)
+        if not prod:
+            try:
+                prod = request.env.ref('s_odoo_saas_master.product_saas_extra_storage').sudo()
+            except Exception:
+                pass
+        if not prod:
+            prod = Product.search([('name', 'ilike', 'Extra Storage'), ('active', '=', True)], limit=1)
+        return prod
+
+    def _get_storage_price_per_gb(self, pricelist=False):
+        """Calculates monthly price per extra GB in pricelist currency ($2 USD base)."""
+        target_currency = pricelist.currency_id if pricelist else request.website._get_current_pricelist().currency_id
+        usd_currency = request.env['res.currency'].sudo().search([('name', '=', 'USD')], limit=1)
+        prod = self._get_extra_storage_product()
+
+        if prod and prod.list_price and target_currency and (target_currency.name or '').upper() == 'XPF':
+            return float(prod.list_price)
+
+        if usd_currency and target_currency and usd_currency != target_currency:
+            try:
+                from odoo import fields
+                price = usd_currency._convert(2.0, target_currency, request.website.company_id, fields.Date.today())
+                if price and price > 0:
+                    return round(price, 2)
+            except Exception:
+                pass
+
+        curr_name = (target_currency.name or '').upper() if target_currency else 'USD'
+        if curr_name == 'USD':
+            return 2.0
+        elif curr_name == 'EUR':
+            return 1.85
+        elif curr_name in ('XPF', 'CFP'):
+            return float(prod.list_price) if (prod and prod.list_price) else 220.0
+
+        if prod and prod.list_price:
+            return float(prod.list_price)
+        return 2.0
+
+
     @http.route([
         '''/pricing''',
         '''/saas/pricing''',
@@ -93,6 +136,16 @@ class Pricing(http.Controller):
         user_monthly_fmt = self._format_price(user_monthly_price)
         user_annual_fmt = self._format_price(user_annual_price)
         user_annual_per_month_fmt = self._format_price(user_annual_per_month)
+
+        # Dynamic Extra Storage product lookup & price calculation ($2 USD / GB / mo)
+        extra_storage_product = self._get_extra_storage_product()
+        extra_storage_monthly_price = self._get_storage_price_per_gb(pricelist)
+        extra_storage_annual_price = round(extra_storage_monthly_price * 12 * 0.85, 2)
+        extra_storage_annual_per_month = round(extra_storage_monthly_price * 0.85, 2)
+
+        extra_storage_monthly_fmt = self._format_price(extra_storage_monthly_price)
+        extra_storage_annual_fmt = self._format_price(extra_storage_annual_price)
+        extra_storage_annual_per_month_fmt = self._format_price(extra_storage_annual_per_month)
 
         data = {
             'user': {},
@@ -157,6 +210,15 @@ class Pricing(http.Controller):
             'user_monthly_price_formatted': user_monthly_fmt,
             'user_annual_price_formatted': user_annual_fmt,
             'user_annual_per_month_formatted': user_annual_per_month_fmt,
+            # Extra Storage ($2 USD / GB / mo converted)
+            'extra_storage_product': extra_storage_product,
+            'extra_storage_product_id': extra_storage_product.id if extra_storage_product else False,
+            'extra_storage_monthly_price': extra_storage_monthly_price,
+            'extra_storage_annual_price': extra_storage_annual_price,
+            'extra_storage_annual_per_month': extra_storage_annual_per_month,
+            'extra_storage_monthly_price_formatted': extra_storage_monthly_fmt,
+            'extra_storage_annual_price_formatted': extra_storage_annual_fmt,
+            'extra_storage_annual_per_month_formatted': extra_storage_annual_per_month_fmt,
         }
         return request.render("s_odoo_saas_master.portal_pricing_page", values)
 
@@ -218,6 +280,7 @@ class Pricing(http.Controller):
     def checkout(self, **post):
         pricelist = request.website._get_current_pricelist()
         num_users = int(post.pop('num_users', 1))
+        storage_gb = int(post.pop('storage_gb', 0))
         subscription_type = post.pop('price_by', 'yearly')
         plan_name = post.pop('plan', 'Essential')
         plan_product_id = post.pop('plan_product_id', False)
@@ -242,13 +305,14 @@ class Pricing(http.Controller):
         post['partner'] = request.env.user.partner_id
         post['domain_id'] = post.get('domain')
         post['users_count'] = num_users
+        post['storage_gb'] = storage_gb
         post['plan_name'] = plan_name
         post['plan_product_id'] = plan_product_id
         post['app_ids'] = app_ids
         post['subscription_type'] = subscription_type
         post['pricelist'] = pricelist
         
-        # Create order (Plan line and User line are created with exact discounted prices)
+        # Create order (Plan line, User line, and Extra Storage line are created with exact discounted prices)
         order = request.website.create_saas_order(post)
                 
         request.session['sale_order_id'] = order.id
@@ -274,6 +338,12 @@ class Pricing(http.Controller):
         instance_vals['default_modules'] = default_modules
         instance_vals['partner'] = request.env.user.partner_id
         instance_vals['trial'] = True
+        
+        # Storage configuration for trial
+        storage_gb = instance_vals.get('storage_gb')
+        if storage_gb:
+            instance_vals['storage_limit_gb'] = float(storage_gb)
+
         instance_vals = request.env['saas.odoo.instance'].sudo()._prepare_instance_val_to_create(instance_vals)
         instance = request.env['saas.odoo.instance'].sudo().create(instance_vals)
         instance.action_deploy()

@@ -26,6 +26,7 @@ class SaleOrder(models.Model):
         ('buy_extra', 'Buy Extra')
     ], default='buy_new', readonly=True, copy=False)
     buy_now_from_pricing = fields.Boolean(help="Technical field")
+    storage_limit_gb = fields.Float(string="Storage Limit (GB)", default=5.0)
 
     @api.constrains('is_saas_order', 'order_line')
     def _check_saas_order_line(self):
@@ -62,13 +63,38 @@ class SaleOrder(models.Model):
             raise ValidationError(_("Cannot find Based domain to create Odoo instance"))
 
         default_modules = [line.product_id.technical_name for line in self.order_line if not line.product_id.is_saas_user and line.product_id.technical_name]
+        
+        plan = 'Essential'
+        for line in self.order_line:
+            code = (line.product_id.default_code or '').lower()
+            name = (line.product_id.name or '').lower()
+            if 'growth' in code or 'growth' in name:
+                plan = 'Growth'
+                break
+            elif 'essential' in code or 'essential' in name:
+                plan = 'Essential'
+
+        base_storage = 20.0 if plan == 'Growth' else 5.0
+        extra_storage = 0.0
+        for line in self.order_line:
+            code = (line.product_id.default_code or '').lower()
+            name = (line.product_id.name or '').lower()
+            if code == 'saas_extra_storage' or 'extra storage' in name:
+                extra_storage += float(line.product_uom_qty or 0.0)
+
+        total_storage = self.storage_limit_gb if (self.storage_limit_gb and self.storage_limit_gb > 0) else (base_storage + extra_storage)
+
         data = {
             'sub_domain': self.subdomain,
             'partner': self.partner_id,
             'based_domain': self.based_domain_id,
             'subscription_type': self.subscription_type,
             'default_modules': default_modules,
+            'plan': plan,
             'buy_now_from_pricing': self.buy_now_from_pricing,
+            'storage_limit_gb': total_storage,
+            'storage_gb': total_storage,
+            'extra_storage_gb': extra_storage,
         }
         instance_vals = self.env['saas.odoo.instance']._prepare_instance_val_to_create(data)
         instance = self.env['saas.odoo.instance'].sudo().create(instance_vals)        

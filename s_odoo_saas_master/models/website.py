@@ -89,7 +89,58 @@ class Website(models.Model):
                 'tax_id': [(6, 0, user_product.taxes_id.ids)],
             }))
 
-        # 3. Apps lines
+        # 3. Extra Storage line (if extra_storage_gb > 0)
+        storage_gb = int(data.get('storage_gb', 0))
+        base_storage = 20 if (plan_name and 'growth' in str(plan_name).lower()) else 5
+        if storage_gb < base_storage:
+            storage_gb = base_storage
+        extra_storage_gb = max(0, storage_gb - base_storage)
+
+        if extra_storage_gb > 0:
+            storage_product = False
+            try:
+                storage_product = self.sudo().env.ref('s_odoo_saas_master.product_saas_extra_storage')
+            except Exception:
+                pass
+            if not storage_product or not storage_product.exists():
+                storage_product = Product.search([('default_code', '=ilike', 'saas_extra_storage'), ('active', '=', True)], limit=1)
+            if not storage_product or not storage_product.exists():
+                storage_product = Product.search([('name', 'ilike', 'Extra Storage'), ('active', '=', True)], limit=1)
+
+            storage_monthly_price = 220.0
+            if storage_product and storage_product.exists() and storage_product.list_price:
+                storage_monthly_price = float(storage_product.list_price)
+            else:
+                usd_currency = self.env['res.currency'].sudo().search([('name', '=', 'USD')], limit=1)
+                target_currency = pricelist.currency_id if pricelist else self.company_id.currency_id
+                if usd_currency and target_currency and usd_currency != target_currency:
+                    try:
+                        from odoo import fields
+                        conv = usd_currency._convert(2.0, target_currency, self.company_id, fields.Date.today())
+                        if conv and conv > 0:
+                            storage_monthly_price = float(conv)
+                    except Exception:
+                        pass
+                elif target_currency and target_currency.name == 'USD':
+                    storage_monthly_price = 2.0
+                elif target_currency and target_currency.name == 'EUR':
+                    storage_monthly_price = 1.85
+
+            storage_unit_price = round(storage_monthly_price * multiplier, 2)
+
+            if storage_product and storage_product.exists():
+                order_line_vals.append((0, 0, {
+                    'product_id': storage_product.id,
+                    'name': f"{storage_product.name} ({extra_storage_gb} GB) ({'Annual - 15% OFF' if is_annual else 'Monthly'})",
+                    'product_uom_qty': extra_storage_gb,
+                    'product_uom': storage_product.uom_id.id,
+                    'price_unit': storage_unit_price,
+                    'tax_id': [(6, 0, storage_product.taxes_id.ids)],
+                }))
+
+        order_vals['storage_limit_gb'] = storage_gb
+
+        # 4. Apps lines
         for app_id in app_ids:
             app_product = Product.browse(app_id)
             if app_product and app_product.exists():
