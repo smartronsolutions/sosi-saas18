@@ -10,7 +10,7 @@
         </xpath>
 
         <!-- 2. Dynamically replace Storage card in Overview detail-grid with live values -->
-        <xpath expr="//div[@id='instanceStorageCard']" position="replace">
+        <xpath expr="//div[hasclass('detail-card')][small[contains(text(), 'Storage')]]" position="replace">
             <div class="glass detail-card" id="instanceStorageCard">
                 <small>Storage</small>
                 <strong>
@@ -41,7 +41,7 @@
         </xpath>
 
         <!-- 4. In Monitor tab, show actual live storage stats on Storage Growth card -->
-        <xpath expr="//div[@id='instanceStorageGrowthCard']//div[hasclass('sub')]" position="replace">
+        <xpath expr="//div[hasclass('chart-card')][h3[contains(text(), 'Storage Growth')]]//div[hasclass('sub')]" position="replace">
             <div class="sub" style="margin-top:9px">
                 Used <b><t t-esc="round(instance.storage_used_gb or 0.0, 1)"/> GB</b> of <b><t t-esc="'Unlimited' if instance.storage_is_unlimited else str(instance.storage_limit_gb) + ' GB'"/></b> (<t t-esc="round(instance.storage_percentage or 0.0, 1)"/>%)
             </div>
